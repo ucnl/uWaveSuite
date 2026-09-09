@@ -3,7 +3,7 @@
 
 const LogStorage = (() => {
 
-    const DB_NAME = 'zima2_logs';
+    const DB_NAME = 'uwavesuite_logs';
     const DB_VERSION = 1;
     const STORE_NAME = 'log_entries';
 

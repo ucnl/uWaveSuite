@@ -438,7 +438,7 @@ const ExportManager = (() => {
 		dxf.push('0'); dxf.push('EOF');
 		
 		const dxfContent = dxf.join('\r\n') + '\r\n';
-		downloadBlob(dxfContent, 'application/octet-stream', `zima2_tracks_${getTimestamp()}.dxf`);
+		downloadBlob(dxfContent, 'application/octet-stream', `uwave_tracks_${getTimestamp()}.dxf`);
 	}
 
 
@@ -453,7 +453,7 @@ const ExportManager = (() => {
         let kml = `<?xml version="1.0" encoding="UTF-8"?>
         <kml xmlns="http://www.opengis.net/kml/2.2">
         <Document>
-            <name>Zima2 Tracks</name>
+            <name>uWave Tracks</name>
             <Style id="stationStyle">
                 <LineStyle><color>ff00ffff</color><width>3</width></LineStyle>
             </Style>
@@ -566,7 +566,7 @@ const ExportManager = (() => {
         }
         
         const kml = generateKML();
-        downloadBlob(kml, 'application/vnd.google-earth.kml+xml', `zima2_tracks_${getTimestamp()}.kml`);
+        downloadBlob(kml, 'application/vnd.google-earth.kml+xml', `uwave_tracks_${getTimestamp()}.kml`);
     }
 
     // ========== ПУБЛИЧНЫЙ API ==========
