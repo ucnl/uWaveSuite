@@ -1,0 +1,781 @@
+<!-- index.html — uWaveSuite Web PWA (структура) -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>uWaveSuite</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <div id="app">
+	<!-- ===== ВЕРХНЯЯ ПАНЕЛЬ ===== -->
+	<div id="top-bar">
+		<div id="connection-indicator" title="Статус соединения"></div>
+		<span id="device-label">uWave</span>
+		<span id="status-text">Не подключено</span>
+		
+		<button id="btn-theme" class="top-btn btn-theme" title="Тема">🎨</button>
+		<button id="btn-connection" class="top-btn btn-connect">🔌 uWave</button>
+		<button id="btn-gnss" class="top-btn btn-gnss">📡 GNSS</button>
+		<button id="btn-tracking" class="top-btn btn-start" disabled>▶ Трекинг</button>
+		<button id="btn-settings" class="top-btn btn-settings">⚙ Настройки</button>
+		
+		<!-- Выпадающая кнопка Инструменты -->
+		<div class="dropdown" style="display:inline-block; position:relative;">
+			<button class="top-btn btn-tools" onclick="UWApp.toggleDropdown('tools-dropdown')">🔧 Инструменты ▾</button>
+			<div id="tools-dropdown" class="dropdown-menu" style="display:none; position:absolute; top:100%; right:0; z-index:300; min-width:200px;">
+				<div class="dropdown-item" onclick="UWApp.openTrackingPanel(); UWApp.closeAllDropdowns();">🎯 Настройка трекинга</div>
+				<div class="dropdown-item" onclick="UWApp.openManualPanel(); UWApp.closeAllDropdowns();">🎮 Ручные запросы</div>
+				<div class="dropdown-item" onclick="UWApp.openDevicesPanel(); UWApp.closeAllDropdowns();">📡 Устройства</div>
+				<div class="dropdown-item" onclick="UWApp.toggleTopoPanel(); UWApp.closeAllDropdowns();">🌐 Топопривязка</div>
+				<div class="dropdown-item" onclick="UWApp.openAddressingPanel(); UWApp.closeAllDropdowns();">🔢 Адресация</div>
+				<div class="dropdown-item" onclick="UWApp.openVLBLPanel(); UWApp.closeAllDropdowns();">📡 VLBL</div>
+				<div class="dropdown-item" onclick="window.open('tools/coord-converter.html','_blank'); UWApp.closeAllDropdowns();">🔄 Конвертер координат</div>
+			</div>
+		</div>
+		
+		<!-- Кнопка Экспорт -->
+		<button class="top-btn btn-export" onclick="UWApp.openExportPanel()">📤 Экспорт</button>
+		
+		<!-- Выпадающая кнопка Лог -->
+		<div class="dropdown" style="display:inline-block; position:relative;">
+			<button class="top-btn btn-log" onclick="UWApp.toggleDropdown('log-dropdown')">📋 Лог ▾</button>
+			<div id="log-dropdown" class="dropdown-menu" style="display:none; position:absolute; top:100%; right:0; z-index:300; min-width:170px;">
+				<div class="dropdown-item" onclick="UWApp.saveLog(); UWApp.closeAllDropdowns();">💾 Сохранить</div>
+				<div class="dropdown-item" onclick="UWApp.loadLog(); UWApp.closeAllDropdowns();">📂 Открыть</div>
+				<div id="log-play-item" class="dropdown-item" onclick="UWApp.togglePlayback(); UWApp.closeAllDropdowns();">▶ Воспроизвести</div>
+				<div id="log-stop-item" class="dropdown-item" onclick="UWApp.togglePlayback(); UWApp.closeAllDropdowns();" style="display:none;">⏹ Остановить</div>
+				<div class="dropdown-item" onclick="UWApp.clearConsole(); UWApp.closeAllDropdowns();">🗑 Очистить консоль</div>
+				<div class="dropdown-item" onclick="UWApp.toggleConsole(); UWApp.closeAllDropdowns();">👁 Показать/скрыть консоль</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- ===== КАРТА ===== -->
+	<div id="map-container">
+		<canvas id="map-canvas"></canvas>
+
+		<!-- Информация об антенне -->
+		<div id="antenna-info">
+			<div><span class="ai-label">Широта:</span> <span class="ai-value" id="ai-lat">--</span></div>
+			<div><span class="ai-label">Долгота:</span> <span class="ai-value" id="ai-lon">--</span></div>
+			<div><span class="ai-label">Азимут:</span> <span class="ai-value" id="ai-hdg">--</span>°</div>
+			<div><span class="ai-label">Глубина:</span> <span class="ai-value" id="ai-dpt">--</span> м</div>
+			<div><span class="ai-label">Темп.:</span> <span class="ai-value" id="ai-tmp">--</span>°C</div>
+		</div>
+
+		<!-- Управление треками -->
+		<div id="tracks-control">
+			<button class="track-btn active" id="btn-tracks-show">📐 Треки</button>
+			<button class="track-btn" id="btn-tracks-clear">🗑 Очистить</button>
+			<button id="btn-ruler" class="track-btn">📏 Линейка</button>
+			
+			<!-- Прогресс воспроизведения -->
+			<div id="playback-progress" style="display:none; width:150px; height:4px; background:var(--bg-tertiary); border-radius:2px;">
+				<div id="playback-progress-fill" style="width:0%; height:100%; background:var(--btn-start); border-radius:2px; transition:width 0.3s;"></div>
+			</div>
+			
+			<!-- Контрол скорости -->
+			<div id="playback-speed-control" style="display:none; align-items:center; gap:5px;">
+				<button id="btn-speed-down" class="track-btn" style="width:32px;">−</button>
+				<span id="playback-speed-current" style="background:var(--btn-start); color:var(--btn-text); padding:4px 10px; border-radius:4px; font-size:12px; font-weight:bold;">1x</span>
+				<button id="btn-speed-up" class="track-btn" style="width:32px;">+</button>
+			</div>
+		</div>
+
+		<!-- Шкала -->
+		<div id="scale-bar"></div>
+		
+		<!-- Консоль -->
+		<div id="console-panel" style="display:none; position:absolute; bottom:10px; left:10px; right:10px; max-height:250px; background:var(--bg-overlay); border:1px solid var(--border-primary); border-radius:8px; z-index:50; flex-direction:column; backdrop-filter:blur(8px);">
+			<!-- Заголовок -->
+			<div id="console-header" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-bottom:1px solid var(--border-primary);">
+				<span style="font-size:12px; font-weight:600; color:var(--text-accent);">📋 Консоль</span>
+				<div style="display:flex; gap:8px; align-items:center;">
+					<span id="console-stats" style="font-size:10px; color:var(--text-secondary); display:flex; gap:8px;"></span>
+					<button id="console-btn-copy" title="Копировать" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;">📋</button>
+					<button id="console-btn-export" title="Экспорт" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;">💾</button>
+					<button id="console-btn-clear" title="Очистить" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;">🗑</button>
+					<button onclick="UIConsole.close()" title="Закрыть" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;">✕</button>
+				</div>
+			</div>
+			
+			<!-- Фильтры -->
+			<div style="display:flex; gap:8px; padding:6px 12px; align-items:center; flex-wrap:wrap; border-bottom:1px solid var(--border-primary);">
+				<input type="text" id="console-filter" placeholder="🔍 Фильтр..." style="flex:1; padding:4px 8px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:11px; min-width:100px;">
+				
+				<label style="font-size:10px; color:var(--text-info); display:flex; align-items:center; gap:2px;">
+					<input type="checkbox" class="console-type-checkbox" data-type="info" checked> Info
+				</label>
+				<label style="font-size:10px; color:var(--border-success); display:flex; align-items:center; gap:2px;">
+					<input type="checkbox" class="console-type-checkbox" data-type="success" checked> OK
+				</label>
+				<label style="font-size:10px; color:var(--border-warning); display:flex; align-items:center; gap:2px;">
+					<input type="checkbox" class="console-type-checkbox" data-type="warning" checked> Warn
+				</label>
+				<label style="font-size:10px; color:var(--border-danger); display:flex; align-items:center; gap:2px;">
+					<input type="checkbox" class="console-type-checkbox" data-type="error" checked> Err
+				</label>
+				<label style="font-size:10px; color:var(--text-muted); display:flex; align-items:center; gap:2px;">
+					<input type="checkbox" class="console-type-checkbox" data-type="debug"> Debug
+				</label>
+				
+				<label style="font-size:10px; color:var(--text-secondary); display:flex; align-items:center; gap:2px;">
+					<input type="checkbox" id="console-auto-scroll" checked> Auto
+				</label>
+			</div>
+			
+			<!-- Содержимое -->
+			<div id="console-content" style="padding:8px 12px; overflow-y:auto; font-family:'Consolas','Monaco',monospace; font-size:11px; line-height:1.5; flex:1;"></div>
+		</div>
+    </div>
+	
+	<!-- Панель топопривязки -->
+	<div id="topo-panel">
+		<h3>🌐 Топопривязка</h3>
+		<div id="topo-gnss-status">Внешний GNSS не подключен</div>
+		<div class="topo-row">
+			<label>Широта:</label>
+			<input type="text" id="topo-lat" placeholder="55.123456">
+		</div>
+		<div class="topo-row">
+			<label>Долгота:</label>
+			<input type="text" id="topo-lon" placeholder="37.654321">
+		</div>
+		<div class="topo-row">
+			<label>Курс (°):</label>
+			<input type="number" id="topo-hdg" placeholder="0" min="0" max="360" step="0.1" value="0">
+		</div>
+		<div class="topo-buttons">
+			<button class="btn-get-gnss" onclick="UWApp.getPhoneGPS()">📱 GPS</button>
+			<button class="btn-apply-topo" onclick="UWApp.applyTopoBinding()">✓ Применить</button>
+			<button class="btn-cancel-topo" onclick="UWApp.toggleTopoPanel()">✕ Отмена</button>
+			<button class="btn-reset-topo" onclick="UWApp.clearTopoBinding()">🗑 Сброс</button>
+		</div>
+	</div>
+
+	<!-- Панель ручных запросов -->
+	<div id="manual-panel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--btn-tools); border-radius:12px; padding:20px; z-index:100; min-width:350px; max-height:80vh; overflow-y:auto; backdrop-filter:blur(10px);">
+		<h3 style="color:var(--btn-tools); text-align:center; margin-bottom:16px;">🎮 Ручные запросы</h3>
+		
+		<!-- Статус -->
+		<div id="manual-status" style="text-align:center; font-size:12px; margin-bottom:12px; min-height:18px;"></div>
+		
+		<!-- Короткие запросы -->
+		<div class="settings-section">
+			<h4>📻 Короткий запрос (CDMA)</h4>
+			<div class="settings-row">
+				<label>TX канал:</label>
+				<input type="number" id="rc-tx-ch" value="0" min="0">
+			</div>
+			<div class="settings-row">
+				<label>RX канал:</label>
+				<input type="number" id="rc-rx-ch" value="0" min="0">
+			</div>
+			<div class="settings-row">
+				<label>Команда:</label>
+				<select id="rc-cmd" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+					<option value="0">PING</option>
+					<option value="2" selected>Глубина (DPT)</option>
+					<option value="3">Температура (TMP)</option>
+					<option value="4">Напряжение (BAT)</option>
+					<option value="7">User CMD 0</option>
+					<option value="8">User CMD 1</option>
+					<option value="9">User CMD 2</option>
+					<option value="10">User CMD 3</option>
+					<option value="11">User CMD 4</option>
+					<option value="12">User CMD 5</option>
+					<option value="13">User CMD 6</option>
+					<option value="14">User CMD 7</option>
+					<option value="15">User CMD 8</option>
+				</select>
+			</div>
+			<button id="btn-rc-send" class="btn-apply-topo" style="width:100%; margin-top:8px;">📤 Отправить</button>
+			
+			<!-- История RC -->
+			<div id="rc-history" style="margin-top:8px; padding:8px; background:var(--bg-tertiary); border-radius:4px;"></div>
+		</div>
+		
+		<!-- Пакетные запросы -->
+		<div class="settings-section" style="margin-top:16px;">
+			<h4>📦 Пакетный запрос (логический)</h4>
+			<div class="settings-row">
+				<label>Адрес:</label>
+				<input type="number" id="pt-addr" value="0" min="0" max="255">
+			</div>
+			<div class="settings-row">
+				<label>Попытки:</label>
+				<input type="number" id="pt-tries" value="3" min="1" max="10">
+			</div>
+			<div class="settings-row">
+				<label>Данные:</label>
+				<input type="text" id="pt-data" placeholder="Текст (до 64 байт)" maxlength="64">
+			</div>
+			<div style="text-align:right; font-size:10px; color:var(--text-secondary); margin-top:-6px;">
+				<span id="pt-size-hint">0 / 64</span>
+			</div>
+			<button id="btn-pt-send" class="btn-apply-topo" style="width:100%; margin-top:8px;">📤 Отправить пакет</button>
+			
+			<!-- История PT -->
+			<div id="pt-history" style="margin-top:8px; padding:8px; background:var(--bg-tertiary); border-radius:4px;"></div>
+		</div>
+		
+		<!-- Запрос данных -->
+		<div class="settings-section" style="margin-top:16px;">
+			<h4>🔍 Запрос данных (ITG)</h4>
+			<div class="settings-row">
+				<label>Адрес:</label>
+				<input type="number" id="pt-itg-addr" value="0" min="0" max="255">
+			</div>
+			<div class="settings-row">
+				<label>Data ID:</label>
+				<select id="pt-itg-dataid" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+					<option value="0">Глубина (DPT)</option>
+					<option value="1">Температура (TMP)</option>
+					<option value="2">Напряжение (BAT)</option>
+				</select>
+			</div>
+			<button onclick="UIManual.sendPTInterrogation()" class="btn-apply-topo" style="width:100%; margin-top:8px;">🔍 Запросить</button>
+		</div>
+		
+		<!-- Кнопки -->
+		<div style="display:flex; gap:8px; margin-top:16px;">
+			<button onclick="UIManual.clearHistory()" class="btn-cancel-topo" style="flex:1;">🗑 Очистить историю</button>
+			<button onclick="UIManual.close()" class="btn-cancel-topo" style="flex:1;">✕ Закрыть</button>
+		</div>
+	</div>            
+
+	<!-- Панель трекинга -->
+	<div id="tracking-panel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--btn-start); border-radius:12px; padding:20px; z-index:100; min-width:350px; max-height:80vh; overflow-y:auto; backdrop-filter:blur(10px);">
+		<h3 style="color:var(--btn-start); text-align:center; margin-bottom:16px;">🎯 Трекинг</h3>
+		
+		<!-- Статус -->
+		<div id="tracking-status" style="text-align:center; font-size:12px; margin-bottom:12px; min-height:18px;"></div>
+		
+		<!-- Кнопки управления -->
+		<div style="display:flex; gap:8px; margin-bottom:16px;">
+			<button id="tracking-btn-start" class="btn-apply-topo" style="flex:1;">▶ Старт</button>
+			<button id="tracking-btn-pause" class="btn-get-gnss" style="flex:1;" disabled>⏸ Пауза</button>
+			<button id="tracking-btn-stop" class="btn-reset-topo" style="flex:1;" disabled>⏹ Стоп</button>
+		</div>
+		
+		<!-- Режим адресации -->
+		<div class="settings-section">
+			<h4>⚙ Режим адресации</h4>
+			<div class="settings-row">
+				<label>Режим:</label>
+				<select id="tracking-mode" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+					<option value="cdma">📻 CDMA каналы</option>
+					<option value="logical">🔢 Логические адреса</option>
+				</select>
+			</div>
+		</div>
+		
+		<!-- Добавление устройства -->
+		<div class="settings-section">
+			<h4>📡 Добавить устройство</h4>
+			
+			<!-- Для CDMA режима -->
+			<div id="tracking-add-cdma">
+				<div class="settings-row">
+					<label>TX канал:</label>
+					<input type="number" id="tracking-add-tx-ch" value="0" min="0">
+				</div>
+				<div class="settings-row">
+					<label>RX канал:</label>
+					<input type="number" id="tracking-add-rx-ch" value="0" min="0">
+				</div>
+			</div>
+			
+			<!-- Для Logical режима -->
+			<div id="tracking-add-logical" style="display:none;">
+				<div class="settings-row">
+					<label>Адрес:</label>
+					<input type="number" id="tracking-add-address" value="0" min="0" max="254">
+				</div>
+			</div>
+			
+			<button id="tracking-btn-add" class="btn-apply-topo" style="width:100%; margin-top:8px;">+ Добавить</button>
+		</div>
+		
+		<!-- Настройки -->
+		<div class="settings-section">
+			<h4>⚙ Настройки опроса</h4>
+			<div class="settings-row">
+				<label>Интервал (мс):</label>
+				<input type="number" id="tracking-interval" value="2000" min="100" step="100">
+			</div>
+			<div class="settings-row">
+				<label>Режим команд:</label>
+				<select id="tracking-command-mode" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+					<option value="weighted">Взвешенный (5:1:1)</option>
+					<option value="cycle">Циклический</option>
+					<option value="single">Одиночный</option>
+				</select>
+			</div>
+		</div>
+		
+		<!-- Список устройств -->
+		<div class="settings-section">
+			<h4>📡 Устройства в трекинге</h4>
+			<div id="tracking-devices-list" style="display:flex; flex-wrap:wrap; gap:4px; padding:8px; background:var(--bg-tertiary); border-radius:4px;"></div>
+			<button id="tracking-btn-clear" class="btn-cancel-topo" style="width:100%; margin-top:8px;">🗑 Очистить все</button>
+		</div>
+		
+		<!-- Статистика -->
+		<div class="settings-section">
+			<h4>📊 Статистика</h4>
+			<div id="tracking-stats" style="font-size:11px; line-height:1.8;"></div>
+		</div>
+		
+		<!-- Закрыть -->
+		<button onclick="UITracking.close()" class="btn-cancel-topo" style="width:100%; margin-top:12px;">✕ Закрыть</button>
+	</div>
+
+	<!-- Панель адресации -->
+	<div id="addressing-panel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--btn-settings); border-radius:12px; padding:20px; z-index:100; min-width:350px; max-height:80vh; overflow-y:auto; backdrop-filter:blur(10px);">
+		<h3 style="color:var(--btn-settings); text-align:center; margin-bottom:16px;">🔢 Адресация</h3>
+		
+		<!-- Статус -->
+		<div id="addr-status" style="text-align:center; font-size:12px; margin-bottom:12px; min-height:18px;"></div>
+		
+		<!-- PTS статус -->
+		<div style="text-align:center; margin-bottom:12px;">
+			<span style="font-size:11px; color:var(--text-secondary);">PTS: </span>
+			<span id="addr-pts-status" style="font-size:11px; font-weight:600;">--</span>
+		</div>
+		
+		<!-- Режим адресации -->
+		<div class="settings-section">
+			<h4>⚙ Режим</h4>
+			<div class="settings-row">
+				<label>Режим:</label>
+				<select id="addr-mode" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+					<option value="cdma">📻 CDMA (кодовые каналы)</option>
+					<option value="logical">🔢 Логический (адреса 0-255)</option>
+				</select>
+			</div>
+			
+			<!-- Информация о режиме -->
+			<div id="addr-mode-info" style="font-size:11px; margin-top:8px; padding:8px; background:var(--bg-tertiary); border-radius:4px;"></div>
+			
+			<button id="addr-btn-mode-toggle" class="btn-get-gnss" style="width:100%; margin-top:8px;">🔄 Переключить режим</button>
+		</div>
+		
+		<!-- Локальный адрес -->
+		<div class="settings-section">
+			<h4>📍 Локальный адрес</h4>
+			<div class="settings-row">
+				<label>Адрес:</label>
+				<input type="number" id="addr-local-address" value="0" min="0" max="255">
+			</div>
+			
+			<!-- Информация об адресе -->
+			<div id="addr-info" style="font-size:11px; margin-top:8px; padding:8px; background:var(--bg-tertiary); border-radius:4px;"></div>
+			
+			<div class="settings-row" style="margin-top:8px;">
+				<label>Сохранить:</label>
+				<input type="checkbox" id="addr-save-flash" style="width:16px; height:16px;">
+				<span style="font-size:11px; color:var(--text-secondary);">Во flash</span>
+			</div>
+		</div>
+		
+		<!-- Кнопки -->
+		<div style="display:flex; gap:8px; margin-top:12px;">
+			<button id="addr-btn-apply" class="btn-apply-topo" style="flex:1;">✓ Применить</button>
+			<button id="addr-btn-read" class="btn-get-gnss" style="flex:1;">📖 Читать</button>
+		</div>
+		
+		<!-- Закрыть -->
+		<button onclick="UIAddressing.close()" class="btn-cancel-topo" style="width:100%; margin-top:12px;">✕ Закрыть</button>
+	</div>
+
+	<!-- Панель VLBL -->
+	<div id="vlbl-panel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--btn-export); border-radius:12px; padding:20px; z-index:100; min-width:400px; max-height:80vh; overflow-y:auto; backdrop-filter:blur(10px);">
+		<h3 style="color:var(--btn-export); text-align:center; margin-bottom:16px;">📡 VLBL Навигация</h3>
+		
+		<!-- Статус -->
+		<div id="vlbl-status" style="text-align:center; font-size:12px; margin-bottom:12px; min-height:18px;"></div>
+		
+		<!-- Автосбор -->
+		<button id="vlbl-btn-auto-solve" class="btn-apply-topo" style="width:100%; margin-bottom:16px;">▶ Автосбор: ВЫКЛ</button>
+		
+		<!-- Базы (неподвижные модемы) -->
+		<div class="settings-section">
+			<h4>📍 Базы (неподвижные модемы)</h4>
+			
+			<div class="settings-row">
+				<label>Адрес:</label>
+				<input type="number" id="vlbl-base-address" placeholder="Авто" min="0" max="255">
+			</div>
+			<div class="settings-row">
+				<label>Имя:</label>
+				<input type="text" id="vlbl-base-name" placeholder="База">
+			</div>
+			
+			<button id="vlbl-btn-add" class="btn-apply-topo" style="width:100%; margin-top:8px;">+ Добавить базу</button>
+			
+			<!-- Список баз -->
+			<div id="vlbl-bases-list" style="margin-top:8px; padding:8px; background:var(--bg-tertiary); border-radius:4px; font-size:11px;"></div>
+			
+			<button id="vlbl-btn-clear" class="btn-reset-topo" style="width:100%; margin-top:8px;">🗑 Очистить все</button>
+		</div>
+		
+		<!-- Измерения -->
+		<div class="settings-section">
+			<h4>📏 Измерения (автоматически)</h4>
+			
+			<!-- Список измерений -->
+			<div id="vlbl-measurements" style="padding:8px; background:var(--bg-tertiary); border-radius:4px; font-size:11px; max-height:150px; overflow-y:auto;"></div>
+			
+			<button id="vlbl-btn-clear-measurements" class="btn-cancel-topo" style="width:100%; margin-top:8px;">🗑 Очистить измерения</button>
+		</div>
+		
+		<!-- Решение -->
+		<div class="settings-section">
+			<h4>🎯 Решение</h4>
+			
+			<div class="settings-row">
+				<label>База:</label>
+				<select id="vlbl-solve-base" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+					<option value="">Выберите базу...</option>
+				</select>
+			</div>
+			
+			<button id="vlbl-btn-solve" class="btn-apply-topo" style="width:100%; margin-top:8px;">🔍 Решить позицию</button>
+			
+			<!-- Результат -->
+			<div id="vlbl-solution" style="margin-top:8px; padding:8px; background:var(--bg-tertiary); border-radius:4px; font-size:11px;"></div>
+		</div>
+		
+		<!-- Закрыть -->
+		<button onclick="UIVLBL.close()" class="btn-cancel-topo" style="width:100%; margin-top:12px;">✕ Закрыть</button>
+	</div>
+
+	<!-- Панель устройств -->
+	<div id="devices-panel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--text-accent); border-radius:12px; padding:20px; z-index:100; min-width:400px; max-width:500px; max-height:80vh; overflow-y:auto; backdrop-filter:blur(10px);">
+		<h3 style="color:var(--text-accent); text-align:center; margin-bottom:16px;">📡 Устройства</h3>
+		
+		<!-- Поиск -->
+		<div style="margin-bottom:12px;">
+			<input type="text" id="devices-search" placeholder="🔍 Поиск..." style="width:100%; padding:8px 12px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
+		</div>
+		
+		<!-- Фильтры -->
+		<div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+			<label style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
+				<input type="checkbox" id="devices-filter-usbl" class="devices-filter-checkbox" checked> USBL
+			</label>
+			<label style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
+				<input type="checkbox" id="devices-filter-nonusbl" class="devices-filter-checkbox" checked> Обычные
+			</label>
+			<label style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
+				<input type="checkbox" id="devices-filter-timeout" class="devices-filter-checkbox" checked> Таймаут
+			</label>
+			<label style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
+				<input type="checkbox" id="devices-filter-active" class="devices-filter-checkbox" checked> Активные
+			</label>
+		</div>
+		
+		<!-- Сортировка -->
+		<div style="display:flex; gap:8px; margin-bottom:12px; align-items:center;">
+			<select id="devices-sort" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:11px;">
+				<option value="address">По адресу</option>
+				<option value="range">По дальности</option>
+				<option value="azimuth">По азимуту</option>
+				<option value="age">По возрасту</option>
+			</select>
+			<button id="devices-sort-order" style="padding:6px 10px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); cursor:pointer;">↑</button>
+		</div>
+		
+		<!-- Статистика -->
+		<div id="devices-stats" style="display:flex; gap:8px; margin-bottom:12px; font-size:11px; color:var(--text-secondary); flex-wrap:wrap;"></div>
+		
+		<!-- Список устройств -->
+		<div id="devices-list" style="max-height:50vh; overflow-y:auto;"></div>
+		
+		<!-- Кнопки -->
+		<div style="display:flex; gap:8px; margin-top:12px;">
+			<button id="devices-btn-refresh" class="btn-get-gnss" style="flex:1;">🔄 Обновить</button>
+			<button id="devices-btn-export" class="btn-get-gnss" style="flex:1;">💾 Экспорт</button>
+			<button id="devices-btn-clear" class="btn-reset-topo" style="flex:1;">🗑 Очистить</button>
+		</div>
+		
+		<!-- Закрыть -->
+		<button onclick="UIDevices.close()" class="btn-cancel-topo" style="width:100%; margin-top:8px;">✕ Закрыть</button>
+	</div>
+
+	<!-- Панель экспорта -->
+	<div id="export-panel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--btn-export); border-radius:12px; padding:20px; z-index:100; min-width:400px; max-height:80vh; overflow-y:auto; backdrop-filter:blur(10px);">
+		<h3 style="color:var(--btn-export); text-align:center; margin-bottom:16px;">📤 Экспорт данных</h3>
+		
+		<!-- Статус -->
+		<div id="export-status" style="text-align:center; font-size:12px; margin-bottom:12px; min-height:18px;"></div>
+		
+		<!-- Статистика -->
+		<div id="export-stats" style="font-size:12px; margin-bottom:12px;"></div>
+		
+		<!-- Формат -->
+		<div class="settings-section">
+			<h4>⚙ Формат</h4>
+			<div class="settings-row">
+				<label>Формат:</label>
+				<select id="export-format" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+					<option value="csv">📊 CSV</option>
+					<option value="kml">🗺 KML</option>
+					<option value="json">💾 JSON</option>
+					<option value="gga">📡 NMEA GGA</option>
+					<option value="dxf">📐 DXF (CAD)</option>
+				</select>
+			</div>
+			
+			<!-- Опции CSV -->
+			<div id="export-csv-options">
+				<div class="settings-row">
+					<label>Разделитель:</label>
+					<select id="export-delimiter" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+						<option value="semicolon">; (точка с запятой)</option>
+						<option value="comma">, (запятая)</option>
+						<option value="tab">Tab</option>
+					</select>
+				</div>
+				<div class="settings-row">
+					<label>Десятичный:</label>
+					<select id="export-decimal" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+						<option value=".">. (точка)</option>
+						<option value=",">, (запятая)</option>
+					</select>
+				</div>
+			</div>
+			
+			<!-- Опции KML -->
+			<div id="export-kml-options" style="display:none;">
+				<div class="settings-row">
+					<small style="color:var(--text-secondary);">KML включает точки устройств и треки</small>
+				</div>
+			</div>
+		</div>
+		
+		<!-- Опции данных -->
+		<div class="settings-section">
+			<h4>📊 Данные</h4>
+			<div style="display:flex; flex-wrap:wrap; gap:8px;">
+				<label style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
+					<input type="checkbox" class="export-option-checkbox" data-option="includeDepth" checked> Глубина
+				</label>
+				<label style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
+					<input type="checkbox" class="export-option-checkbox" data-option="includeAzimuth" checked> Азимут
+				</label>
+				<label style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
+					<input type="checkbox" class="export-option-checkbox" data-option="includeMSR" checked> MSR
+				</label>
+				<label style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
+					<input type="checkbox" class="export-option-checkbox" data-option="includeTemperature" checked> Температура
+				</label>
+				<label style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
+					<input type="checkbox" class="export-option-checkbox" data-option="includeVoltage" checked> Напряжение
+				</label>
+				<label style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
+					<input type="checkbox" class="export-option-checkbox" data-option="includeCoordinates" checked> Координаты
+				</label>
+				<label style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
+					<input type="checkbox" class="export-option-checkbox" data-option="includeTimestamps" checked> Время
+				</label>
+			</div>
+		</div>
+		
+		<!-- Превью -->
+		<div class="settings-section">
+			<h4>👁 Превью</h4>
+			<pre id="export-preview" style="display:none; padding:8px; background:var(--bg-tertiary); border-radius:4px; font-size:10px; font-family:'Consolas','Monaco',monospace; max-height:200px; overflow-y:auto; white-space:pre-wrap;"></pre>
+		</div>
+		
+		<!-- Кнопки -->
+		<div style="display:flex; gap:8px; margin-top:12px;">
+			<button id="export-btn-preview" class="btn-get-gnss" style="flex:1;">👁 Превью</button>
+			<button id="export-btn-copy" class="btn-get-gnss" style="flex:1;">📋 Копировать</button>
+			<button id="export-btn-export" class="btn-apply-topo" style="flex:1;">💾 Экспорт</button>
+		</div>
+		
+		<!-- Закрыть -->
+		<button onclick="UIExport.close()" class="btn-cancel-topo" style="width:100%; margin-top:8px;">✕ Закрыть</button>
+	</div>
+
+	<!-- ===== ПАНЕЛЬ УСТРОЙСТВ ===== -->
+	<div id="devices-bar" class="empty"></div>
+
+	<!-- ===== FOOTER ===== -->
+	<footer class="footer">
+		<div class="footer-content">
+			<div class="footer-links">
+				<a href="https://github.com/ucnl/uWaveSuite/" target="_blank" class="footer-link">⭐ GitHub</a>
+				<a href="docs/guide.html" target="_blank" class="footer-link">📖 uWaveSuite Docs</a>
+				<a href="https://docs.unavlab.com/" target="_blank" class="footer-link">📖 uWave Docs</a>
+			</div>
+			<div class="footer-info">
+				<span class="footer-copy">&copy; 2026 UC&NL</span>
+				<span class="footer-desc">Pure Open Source</span>
+				<span>v<span id="app-version">--</span></span>
+			</div>
+		</div>
+	</footer>
+
+    <!-- ===== МОДАЛЬНОЕ ОКНО НАСТРОЕК ===== -->
+    <div id="settings-overlay">
+        <div id="settings-modal">
+            <div id="settings-header">
+                <h3>⚙ Настройки</h3>
+                <button onclick="UWApp.closeSettings()" title="Закрыть">✕</button>
+            </div>
+            <div id="settings-body">
+                <!-- Секция: Устройство -->
+                <div class="settings-section">
+                    <h4>📡 Устройство</h4>
+                    <div class="settings-row">
+                        <label>TX канал:</label>
+                        <input type="number" id="cfg-tx-ch" value="0" min="0">
+                    </div>
+                    <div class="settings-row">
+                        <label>RX канал:</label>
+                        <input type="number" id="cfg-rx-ch" value="0" min="0">
+                    </div>
+                    <div class="settings-row">
+                        <label>Солёность:</label>
+                        <input type="number" id="cfg-salinity" value="0" min="0" max="40" step="0.1">
+                    </div>
+                    <div class="settings-row">
+                        <label>Скорость звука:</label>
+                        <input type="number" id="cfg-soundspeed" placeholder="Авто" min="1300" max="1800" step="0.1">
+                    </div>
+                </div>
+                
+                <!-- Секция: GNSS -->
+                <div class="settings-section">
+                    <h4>📡 GNSS-компас</h4>
+                    <div class="settings-row">
+                        <label>Режим компаса:</label>
+                        <select id="cfg-compass-mode" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+                            <option value="auto">Авто</option>
+                            <option value="hdt">Только HDT</option>
+                            <option value="magnetic">Только магнитный</option>
+                        </select>
+                    </div>
+                    <div class="settings-row">
+                        <label>Скорость:</label>
+                        <select id="cfg-gnss-baud" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+                            <option value="4800">4800</option>
+                            <option value="9600">9600</option>
+                            <option value="19200">19200</option>
+                            <option value="38400" selected>38400</option>
+                            <option value="57600">57600</option>
+                            <option value="115200">115200</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Секция: Антенна -->
+                <div class="settings-section">
+                    <h4>📍 Антенна</h4>
+                    <div class="settings-row">
+                        <label>Режим:</label>
+                        <select id="cfg-antenna-mode" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+                            <option value="cartesian_fixed">📐 Декартов</option>
+                            <option value="geographic">🌍 Географический</option>
+                        </select>
+                    </div>
+                    <div class="settings-row">
+                        <label>Смещение X:</label>
+                        <input type="number" id="cfg-offsetx" value="0" step="0.1">
+                    </div>
+                    <div class="settings-row">
+                        <label>Смещение Y:</label>
+                        <input type="number" id="cfg-offsety" value="0" step="0.1">
+                    </div>
+                    <div class="settings-row">
+                        <label>φ антенны:</label>
+                        <input type="number" id="cfg-phi" value="0" min="0" max="360" step="0.1">
+                    </div>
+                    <div class="settings-row">
+                        <label>Макс. скорость:</label>
+                        <input type="number" id="cfg-max-speed" value="2" min="0.5" max="5" step="0.1">
+                    </div>
+                </div>
+                
+                <!-- Секция: Треки -->
+                <div class="settings-section">
+                    <h4>📐 Треки</h4>
+                    <div class="settings-row">
+                        <label>Макс. точек:</label>
+                        <input type="number" id="cfg-maxpoints" value="500" min="50" max="10000">
+                    </div>
+                    <div class="settings-row">
+                        <label>Мин. дистанция:</label>
+                        <input type="number" id="cfg-minpointdist" value="0.5" min="0.1" max="50" step="0.1">
+                    </div>
+                </div>
+            </div>
+            <div id="settings-footer">
+                <button class="btn-apply" onclick="UWApp.applySettings()">✓ Применить</button>
+                <button class="btn-close-settings" onclick="UWApp.closeSettings()">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+	<!-- ===== СКРИПТЫ (порядок важен) ===== -->
+	<!-- Математика -->
+	<script src="geo-utils.js"></script>
+	<script src="vincenty.js"></script>
+	<script src="haversine.js"></script>
+	<script src="dh-filter.js"></script>
+	<script src="median.js"></script>
+	<script src="smoother.js"></script>
+	<script src="dh-filter-xyz.js"></script>
+	<script src="smoother-xyz.js"></script>
+	<script src="sound-speed.js"></script>
+
+	<!-- Парсеры -->
+	<script src="gnss-parser.js"></script>
+	<script src="webview-stub.js"></script>
+
+	<!-- Ядро протокола -->
+	<script src="uw-protocol.js"></script>
+	<script src="serial-manager.js"></script>
+	<script src="uw-port.js"></script>
+	<script src="uw-queue-manager.js"></script>
+	<script src="uw-device-manager.js"></script>
+	<script src="uw-tracking-engine.js"></script>
+	<script src="uw-usbl-solver.js"></script>
+	<script src="uw-vlbl-solver.js"></script>
+	<script src="settings-storage.js"></script>
+
+	<!-- Данные -->
+	<script src="tracks.js"></script>
+	<script src="poi-manager.js"></script>
+	<script src="log-storage.js"></script>
+	<script src="logger.js"></script>
+	<script src="log-analyzer.js"></script>
+	<script src="export.js"></script>
+
+	<!-- UI модули -->
+	<script src="modules/ui-themes.js"></script>
+	<script src="modules/ui-settings.js"></script>
+	<script src="modules/ui-manual.js"></script>
+	<script src="modules/ui-tracking.js"></script>
+	<script src="modules/ui-addressing.js"></script>
+	<script src="modules/ui-vlbl.js"></script>
+	<script src="modules/ui-devices.js"></script>
+	<script src="modules/ui-console.js"></script>
+	<script src="modules/ui-export.js"></script>
+	<script src="modules/ui-map.js"></script>
+	<script src="modules/ui-ruler.js"></script>
+	<script src="modules/ui-topo.js"></script>
+
+	<!-- Главный модуль -->
+	<script src="app.js"></script>
+</body>
+</html>

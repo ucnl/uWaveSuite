@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Конвертер координат: Geo ↔ XYZ</title>
+    <link rel="manifest" href="data:application/manifest+json,{"name":"Geo%20%E2%86%94%20XYZ%20Converter","short_name":"GeoXYZ","start_url":".","display":"standalone","background_color":"%231a1a2e","theme_color":"%23e83e8c"}">
+    <meta name="theme-color" content="#e83e8c">
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-tertiary: #0f3460;
+            --bg-input: #0a0a1a;
+            --bg-overlay: rgba(22, 33, 62, 0.95);
+            --border-primary: #0f3460;
+            --border-accent: #e83e8c;
+            --text-primary: #e0e0e0;
+            --text-secondary: #aaa;
+            --text-muted: #666;
+            --text-accent: #4ec9b0;
+            --text-info: #569cd6;
+            --shadow: 0 4px 20px rgba(0,0,0,0.3);
+            --radius: 8px;
+            --radius-sm: 6px;
+            --radius-lg: 12px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1100px; margin: 0 auto; }
+        h1 { font-size: 1.5em; margin-bottom: 5px; color: var(--text-accent); display: flex; align-items: center; gap: 10px; }
+        .subtitle { color: var(--text-secondary); margin-bottom: 20px; font-size: 0.9em; }
+
+        .mode-tabs { display: flex; margin-bottom: 25px; border-radius: var(--radius); overflow: hidden; border: 2px solid var(--border-primary); width: fit-content; }
+        .mode-tab { padding: 12px 28px; font-size: 1em; font-weight: 600; cursor: pointer; background: var(--bg-secondary); border: none; color: var(--text-secondary); transition: all 0.2s; }
+        .mode-tab.active { background: var(--border-accent); color: #fff; }
+        .mode-tab:hover:not(.active) { background: var(--bg-tertiary); }
+
+        .step-card { background: var(--bg-secondary); border-radius: var(--radius); padding: 20px; border: 1px solid var(--border-primary); margin-bottom: 20px; }
+        .step-card h3 { font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 12px; }
+
+        textarea {
+            width: 100%; min-height: 130px; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.8em;
+            padding: 12px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm);
+            background: var(--bg-input); color: var(--text-primary); resize: vertical;
+        }
+        textarea:focus { outline: none; border-color: var(--border-accent); }
+
+        .file-upload-area {
+            border: 2px dashed var(--border-accent); border-radius: var(--radius); padding: 20px;
+            text-align: center; cursor: pointer; background: rgba(232,62,140,0.05); margin-bottom: 10px;
+        }
+        .file-upload-area:hover { background: rgba(232,62,140,0.1); }
+        .file-upload-area input[type="file"] { display: none; }
+        .file-upload-area .upload-icon { font-size: 2em; display: block; margin-bottom: 5px; }
+        .file-upload-area .file-name { color: var(--border-accent); font-weight: 600; margin-top: 5px; display: block; }
+
+        .columns-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 15px 0; }
+        .col-group { flex: 1; min-width: 120px; }
+        .col-group label { display: block; font-weight: 600; font-size: 0.8em; margin-bottom: 4px; color: var(--text-secondary); }
+        .col-group select, .col-group input {
+            width: 100%; padding: 8px 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm);
+            font-size: 0.85em; background: var(--bg-input); color: var(--text-primary);
+        }
+
+        .ref-point-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin: 15px 0; }
+        .ref-group { flex: 1; min-width: 100px; }
+        .ref-group label { display: block; font-weight: 600; font-size: 0.8em; margin-bottom: 4px; color: var(--text-secondary); }
+        .ref-group input {
+            width: 100%; padding: 8px 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm);
+            font-size: 0.85em; background: var(--bg-input); color: var(--text-primary); font-family: 'Consolas', monospace;
+        }
+        .ref-auto { font-size: 0.75em; color: var(--text-muted); margin-top: 4px; }
+
+        .preview-section { margin-top: 20px; }
+        .preview-section h3 { margin-bottom: 10px; color: var(--text-secondary); font-size: 0.9em; }
+        .preview-table-wrapper { max-height: 250px; overflow: auto; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); }
+        table.preview-table { width: 100%; border-collapse: collapse; font-size: 0.78em; }
+        table.preview-table th { background: var(--border-accent); color: #fff; padding: 8px 10px; text-align: left; position: sticky; top: 0; z-index: 2; font-weight: 500; white-space: nowrap; }
+        table.preview-table th.highlight-1 { background: #27ae60; }
+        table.preview-table th.highlight-2 { background: #2980b9; }
+        table.preview-table th.highlight-3 { background: #8e44ad; }
+        table.preview-table td { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); white-space: nowrap; }
+        table.preview-table tr:hover td { background: var(--bg-tertiary); }
+
+        .legend { display: flex; gap: 20px; margin: 10px 0; font-size: 0.78em; flex-wrap: wrap; }
+        .legend span { display: flex; align-items: center; gap: 5px; }
+        .legend .dot { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+        .legend .dot.c1 { background: #27ae60; } .legend .dot.c2 { background: #2980b9; } .legend .dot.c3 { background: #8e44ad; }
+
+        .btn-row { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+        button { padding: 10px 20px; font-size: 0.9em; border: none; border-radius: var(--radius-sm); cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--border-accent); color: #fff; }
+        .btn-primary:hover { background: #c03070; }
+        .btn-success { background: #27ae60; color: #fff; }
+        .btn-success:hover { background: #219a52; }
+        .btn-copy { background: #6c5ce7; color: #fff; }
+        .btn-copy:hover { background: #5a4bd1; }
+        .btn-secondary { background: var(--bg-tertiary); color: var(--text-primary); }
+        .btn-secondary:hover { background: #1a4a80; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .status { margin-top: 15px; padding: 10px 15px; border-radius: var(--radius-sm); font-size: 0.85em; display: none; }
+        .status.success { background: #1a3a1a; color: #4caf50; display: block; }
+        .status.error { background: #3a1a1a; color: #f44336; display: block; }
+        .status.info { background: #1a2a3a; color: #64b5f6; display: block; }
+
+        .hidden { display: none !important; }
+
+        #xyzPreviewCanvas {
+            width: 100%; max-width: 600px; height: auto;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-sm);
+        }
+        input[type="range"] {
+            -webkit-appearance: none; appearance: none;
+            height: 6px; background: var(--border-primary);
+            border-radius: 3px; outline: none; cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 20px; height: 20px; border-radius: 50%;
+            background: var(--border-accent); cursor: pointer; border: 2px solid #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Конвертер координат</h1>
+
+        <div class="mode-tabs">
+            <button class="mode-tab active" data-mode="geo2xyz" onclick="switchMode('geo2xyz')">🌍 Geo → 📐 XYZ</button>
+            <button class="mode-tab" data-mode="xyz2geo" onclick="switchMode('xyz2geo')">📐 XYZ → 🌍 Geo</button>
+        </div>
+
+        <!-- ============ Geo → XYZ ============ -->
+        <div id="modeGeo2Xyz">
+            <p class="subtitle">Загрузите KML или CSV с географическими координатами. Утилита пересчитает их в метры (X, Y, Z) относительно опорной точки.</p>
+            <div class="step-card">
+                <h3>📥 Шаг 1. Загрузите данные</h3>
+                <div class="file-upload-area" onclick="document.getElementById('geoFileInput').click()">
+                    <span class="upload-icon">📁</span>
+                    <span class="upload-text">Нажмите для выбора KML или CSV-файла</span>
+                    <span class="file-name" id="geoFileName"></span>
+                    <input type="file" id="geoFileInput" accept=".kml,.xml,.csv,.txt" onchange="handleGeoFile(event)">
+                </div>
+                <textarea id="geoInput" placeholder="Или вставьте содержимое KML / CSV сюда..."></textarea>
+            </div>
+            <div class="step-card">
+                <h3>🎯 Шаг 2. Укажите столбцы (для CSV)</h3>
+                <div class="columns-row">
+                    <div class="col-group"><label for="geoLatCol">🟢 Широта (Lat)</label><select id="geoLatCol"></select></div>
+                    <div class="col-group"><label for="geoLonCol">🔵 Долгота (Lon)</label><select id="geoLonCol"></select></div>
+                    <div class="col-group"><label for="geoDepthCol">🟣 Глубина (Z)</label><select id="geoDepthCol"><option value="-1">— Не использовать —</option></select></div>
+                </div>
+            </div>
+            <div class="step-card">
+                <h3>📍 Шаг 3. Опорная точка (начало координат)</h3>
+                <div class="ref-point-row">
+                    <div class="ref-group">
+                        <label>Широта (Lat₀)</label>
+                        <input type="text" id="geoRefLat" placeholder="Авто (центроида)">
+                        <div class="ref-auto" id="geoCentroidInfo"></div>
+                    </div>
+                    <div class="ref-group">
+                        <label>Долгота (Lon₀)</label>
+                        <input type="text" id="geoRefLon" placeholder="Авто (центроида)">
+                    </div>
+                </div>
+            </div>
+            <div class="preview-section">
+                <h3>👁️ Предпросмотр</h3>
+                <div class="preview-table-wrapper">
+                    <table class="preview-table" id="geoPreviewTable">
+                        <thead><tr><th>#</th><th>Name</th><th>Lat</th><th>Lon</th><th>Depth</th><th>X (E), м</th><th>Y (N), м</th><th>Z, м</th></tr></thead>
+                        <tbody id="geoPreviewBody"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">Загрузите данные</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="btn-row">
+                <button class="btn-primary" onclick="convertGeoToXyz()">🔄 Конвертировать</button>
+                <button class="btn-success" onclick="downloadOutput()" id="btnDownloadGeo2Xyz" disabled>💾 Скачать CSV</button>
+                <button class="btn-copy" onclick="copyToClipboard()" id="btnCopyGeo2Xyz" disabled>📋 Копировать</button>
+            </div>
+        </div>
+
+        <!-- ============ XYZ → Geo ============ -->
+        <div id="modeXyz2Geo" class="hidden">
+            <p class="subtitle">Загрузите CSV с координатами X, Y, Z в метрах. Укажите точку привязки и подберите направление антенны (Heading) по треку на мини-карте.</p>
+            <div class="step-card">
+                <h3>📥 Шаг 1. Загрузите CSV с XYZ</h3>
+                <div class="file-upload-area" onclick="document.getElementById('xyzFileInput').click()">
+                    <span class="upload-icon">📁</span>
+                    <span class="upload-text">Нажмите для выбора CSV-файла</span>
+                    <span class="file-name" id="xyzFileName"></span>
+                    <input type="file" id="xyzFileInput" accept=".csv,.txt" onchange="handleXyzFile(event)">
+                </div>
+                <textarea id="xyzInput" placeholder="Или вставьте CSV с колонками X,Y,Z..."></textarea>
+            </div>
+            <div class="step-card">
+                <h3>🎯 Шаг 2. Укажите столбцы</h3>
+                <div class="columns-row">
+                    <div class="col-group"><label for="xyzXCol">🟢 X (East), м</label><select id="xyzXCol"></select></div>
+                    <div class="col-group"><label for="xyzYCol">🔵 Y (North), м</label><select id="xyzYCol"></select></div>
+                    <div class="col-group"><label for="xyzZCol">🟣 Z (Depth), м</label><select id="xyzZCol"><option value="-1">— Не использовать —</option></select></div>
+                </div>
+            </div>
+            <div class="step-card">
+                <h3>📍 Шаг 3. Топопривязка</h3>
+                <div class="ref-point-row">
+                    <div class="ref-group"><label>Широта антенны</label><input type="text" id="xyzRefLat" placeholder="55.123456"></div>
+                    <div class="ref-group"><label>Долгота антенны</label><input type="text" id="xyzRefLon" placeholder="37.654321"></div>
+                    <div class="ref-group"><label>Heading (°)</label><input type="text" id="xyzHeading" placeholder="0" value="0"></div>
+                </div>
+                <div style="font-size:0.75em;color:var(--text-muted);">Heading: 0° = север, 90° = восток, по часовой стрелке</div>
+            </div>
+            <div class="step-card">
+                <h3>🗺️ Шаг 4. Подберите Heading по треку</h3>
+                <div style="display:flex; gap:15px; align-items:center; margin-bottom:10px;">
+                    <span style="font-size:0.85em;">Heading:</span>
+                    <input type="range" id="xyzHeadingSlider" min="0" max="360" value="0" step="1" 
+                           style="flex:1;" oninput="onHeadingSliderChange()">
+                    <span id="xyzHeadingValue" style="font-weight:600;min-width:45px;">0°</span>
+                </div>
+                <canvas id="xyzPreviewCanvas" width="600" height="400"></canvas>
+                <div style="font-size:0.75em;color:var(--text-muted);margin-top:5px;">
+                    🔴 Опорная точка &nbsp; 🟢 Трек &nbsp; 🟡 Первая точка &nbsp; 📐 N↑ E→
+                </div>
+            </div>
+            <div class="preview-section">
+                <h3>👁️ Предпросмотр таблицы (первые 20 точек)</h3>
+                <div class="preview-table-wrapper">
+                    <table class="preview-table" id="xyzPreviewTable">
+                        <thead><tr><th>#</th><th>X, м</th><th>Y, м</th><th>Z, м</th><th>Lat</th><th>Lon</th><th>Depth</th></tr></thead>
+                        <tbody id="xyzPreviewBody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">Загрузите данные</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="btn-row">
+                <button class="btn-primary" onclick="convertXyzToGeo()">🔄 Конвертировать (Vincenty)</button>
+                <button class="btn-success" onclick="downloadOutput()" id="btnDownloadXyz2Geo" disabled>💾 Скачать CSV</button>
+                <button class="btn-success" onclick="downloadKml()" id="btnDownloadKml" disabled>💾 Скачать KML</button>
+                <button class="btn-copy" onclick="copyToClipboard()" id="btnCopyXyz2Geo" disabled>📋 Копировать</button>
+            </div>
+        </div>
+
+        <div id="status" class="status"></div>
+        <textarea id="outputData" style="display:none;"></textarea>
+    </div>
+
+    <script>
+        // ======== МАТЕМАТИКА ========
+        const WGS84_A = 6378137.0;
+        const WGS84_B = 6356752.314245;
+        const WGS84_F = 1 / 298.257223563;
+
+        function deg2rad(d) { return d * Math.PI / 180; }
+        function rad2deg(r) { return r * 180 / Math.PI; }
+
+        function metersPerDegree(latRad) {
+            const mPerDegLat = 111132.92 - 559.82 * Math.cos(2 * latRad) + 1.175 * Math.cos(4 * latRad);
+            const mPerDegLon = 111412.84 * Math.cos(latRad) - 93.5 * Math.cos(3 * latRad);
+            return { mPerDegLat, mPerDegLon };
+        }
+
+        function geoToXyz(latDeg, lonDeg, depth, refLatDeg, refLonDeg) {
+            const mlat = (latDeg + refLatDeg) / 2 * Math.PI / 180;
+            const mpd = metersPerDegree(mlat);
+            return {
+                x: (lonDeg - refLonDeg) * mpd.mPerDegLon,
+                y: (latDeg - refLatDeg) * mpd.mPerDegLat,
+                z: depth || 0
+            };
+        }
+
+        function xyzToGeo(x, y, z, refLatDeg, refLonDeg, headingDeg) {
+            const hdgRad = deg2rad(headingDeg);
+            const xWorld = x * Math.cos(hdgRad) - y * Math.sin(hdgRad);
+            const yWorld = x * Math.sin(hdgRad) + y * Math.cos(hdgRad);
+            const refLatRad = deg2rad(refLatDeg);
+            const mpd = metersPerDegree(refLatRad);
+            return {
+                lat: refLatDeg + yWorld / mpd.mPerDegLat,
+                lon: refLonDeg + xWorld / mpd.mPerDegLon,
+                depth: z
+            };
+        }
+
+        function xyzToGeoVincenty(x, y, z, refLatDeg, refLonDeg, headingDeg) {
+            const hdgRad = deg2rad(headingDeg);
+            const xWorld = x * Math.cos(hdgRad) - y * Math.sin(hdgRad);
+            const yWorld = x * Math.sin(hdgRad) + y * Math.cos(hdgRad);
+            const dist = Math.sqrt(xWorld * xWorld + yWorld * yWorld);
+            const azmRad = Math.atan2(xWorld, yWorld);
+            return vincentyDirect(deg2rad(refLatDeg), deg2rad(refLonDeg), azmRad, dist, z);
+        }
+
+        function vincentyDirect(latRad, lonRad, azmRad, distM, depth) {
+            const a = WGS84_A, f = WGS84_F, b = WGS84_B;
+            const sin_a1 = Math.sin(azmRad), cos_a1 = Math.cos(azmRad);
+            const tan_u1 = (1 - f) * Math.tan(latRad);
+            const cos_u1 = 1 / Math.sqrt(1 + tan_u1 * tan_u1);
+            const sin_u1 = tan_u1 * cos_u1;
+            const sigma1 = Math.atan2(tan_u1, cos_a1);
+            const sin_alpha = cos_u1 * sin_a1;
+            const cos_sq_alpha = 1 - sin_alpha * sin_alpha;
+            const u_sq = cos_sq_alpha * (a * a - b * b) / (b * b);
+            const A = 1 + u_sq / 16384 * (4096 + u_sq * (-768 + u_sq * (320 - 175 * u_sq)));
+            const B = u_sq / 1024 * (256 + u_sq * (-128 + u_sq * (74 - 47 * u_sq)));
+
+            let sigma = distM / (b * A), sigma_prev, it = 0;
+            do {
+                const cos_2sm = Math.cos(2 * sigma1 + sigma);
+                const sin_s = Math.sin(sigma), cos_s = Math.cos(sigma);
+                const ds = B * sin_s * (cos_2sm + B/4 * (cos_s * (-1 + 2*cos_2sm*cos_2sm) - B/6 * cos_2sm * (-3 + 4*sin_s*sin_s) * (-3 + 4*cos_2sm*cos_2sm)));
+                sigma_prev = sigma;
+                sigma = distM / (b * A) + ds;
+                it++;
+            } while (Math.abs(sigma - sigma_prev) > 1e-12 && it < 1000);
+
+            const sin_s = Math.sin(sigma), cos_s = Math.cos(sigma);
+            const x = sin_u1 * sin_s - cos_u1 * cos_s * cos_a1;
+            const ep_lat = Math.atan2(sin_u1 * cos_s + cos_u1 * sin_s * cos_a1, (1 - f) * Math.sqrt(sin_alpha * sin_alpha + x * x));
+            const lambda = Math.atan2(sin_s * sin_a1, cos_u1 * cos_s - sin_u1 * sin_s * cos_a1);
+            const C = f / 16 * cos_sq_alpha * (4 + f * (4 - 3 * cos_sq_alpha));
+            const L = lambda - (1 - C) * f * sin_alpha * (sigma + C * sin_s * (Math.cos(2*sigma1+sigma) + C * cos_s * (-1 + 2*Math.cos(2*sigma1+sigma)*Math.cos(2*sigma1+sigma))));
+            const ep_lon = lonRad + L;
+
+            return {
+                lat: rad2deg(ep_lat),
+                lon: rad2deg(((ep_lon % (2*Math.PI)) + 3*Math.PI) % (2*Math.PI) - Math.PI),
+                depth: depth || 0
+            };
+        }
+
+        // ======== СОСТОЯНИЕ ========
+        let currentMode = 'geo2xyz';
+        let generatedOutput = '';
+        let generatedFileExt = '.csv';
+        let generatedKml = '';
+
+        let geoParsedPoints = [];
+        let geoHeaders = [];
+        let geoRows = [];
+
+        let xyzHeaders = [];
+        let xyzRows = [];
+        let xyzConvertedPoints = [];
+        let xyzPreviewData = [];
+
+        // ======== ПЕРЕКЛЮЧЕНИЕ ========
+        function switchMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+            document.getElementById('modeGeo2Xyz').classList.toggle('hidden', mode !== 'geo2xyz');
+            document.getElementById('modeXyz2Geo').classList.toggle('hidden', mode !== 'xyz2geo');
+            generatedOutput = ''; generatedKml = '';
+            updateAllButtons(true);
+            hideStatus();
+        }
+
+        function updateAllButtons(disabled) {
+            const ids = currentMode === 'geo2xyz'
+                ? ['btnDownloadGeo2Xyz', 'btnCopyGeo2Xyz']
+                : ['btnDownloadXyz2Geo', 'btnDownloadKml', 'btnCopyXyz2Geo'];
+            ids.forEach(id => { const b = document.getElementById(id); if (b) b.disabled = disabled; });
+        }
+
+        function showStatus(msg, type) { const s = document.getElementById('status'); s.className = 'status ' + type; s.textContent = msg; }
+        function hideStatus() { document.getElementById('status').className = 'status'; }
+
+        // ======== ПАРСИНГ ========
+        function detectSeparator(text) {
+            const firstLine = text.split('\n')[0];
+            if (!firstLine) return ',';
+            const counts = { ',': (firstLine.match(/,/g)||[]).length, '\t': (firstLine.match(/\t/g)||[]).length, ';': (firstLine.match(/;/g)||[]).length };
+            const best = Object.entries(counts).sort((a,b) => b[1]-a[1])[0];
+            return best[1] > 0 ? best[0] : ',';
+        }
+
+        function parseCsvData(text) {
+            const sep = detectSeparator(text);
+            const lines = text.split('\n').filter(l => l.trim());
+            const first = lines[0].split(sep).map(h => h.trim());
+            const second = lines.length > 1 ? lines[1].split(sep) : null;
+            let hasHeader = false;
+            if (second && first.length === second.length) {
+                const fN = first.every(v => !isNaN(parseFloat(v.replace(',','.'))) || v.trim()==='');
+                const sN = second.every(v => !isNaN(parseFloat(v.replace(',','.'))) || v.trim()==='');
+                if (!fN && sN) hasHeader = true;
+                if (first.some(v => /[NSWE]/.test(v.toUpperCase())) && !fN) hasHeader = true;
+            }
+            const headers = hasHeader ? first : first.map((_,i) => `Col ${i+1}`);
+            const rows = hasHeader ? lines.slice(1).map(l => l.split(sep).map(v => v.trim())) : lines.map(l => l.split(sep).map(v => v.trim()));
+            return { headers, rows };
+        }
+
+        function parseKmlCoords(kmlText) {
+            const points = [];
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(kmlText, 'text/xml');
+            if (doc.querySelector('parsererror')) return parseKmlRegex(kmlText);
+            doc.querySelectorAll('Placemark').forEach((pm, idx) => {
+                let name = '';
+                const nameEl = pm.querySelector('name');
+                if (nameEl) name = nameEl.textContent.trim();
+                pm.querySelectorAll('coordinates').forEach(coordEl => {
+                    coordEl.textContent.trim().split(/\s+/).forEach(cs => {
+                        const parts = cs.split(',');
+                        if (parts.length >= 2) {
+                            const lon = parseFloat(parts[0]), lat = parseFloat(parts[1]), alt = parseFloat(parts[2]) || 0;
+                            if (!isNaN(lat) && !isNaN(lon)) points.push({ name, lat, lon, depth: isNaN(alt)?0:alt });
+                        }
+                    });
+                });
+            });
+            return points;
+        }
+
+        function parseKmlRegex(kmlText) {
+            const points = [];
+            const re = /<coordinates>([\s\S]*?)<\/coordinates>/gi;
+            let m;
+            while ((m = re.exec(kmlText)) !== null) {
+                m[1].trim().split(/\s+/).forEach(cs => {
+                    const parts = cs.split(',');
+                    if (parts.length >= 2) {
+                        const lon = parseFloat(parts[0]), lat = parseFloat(parts[1]), alt = parseFloat(parts[2]) || 0;
+                        if (!isNaN(lat) && !isNaN(lon)) points.push({ name: '', lat, lon, depth: isNaN(alt)?0:alt });
+                    }
+                });
+            }
+            return points;
+        }
+
+        function buildColumnSelectors(headers, latId, lonId, depthId) {
+            const latSel = document.getElementById(latId), lonSel = document.getElementById(lonId), depthSel = document.getElementById(depthId);
+            latSel.innerHTML = ''; lonSel.innerHTML = '';
+            if (depthSel) depthSel.innerHTML = '<option value="-1">— Не использовать —</option>';
+            headers.forEach((h, i) => {
+                const t = `${i}: ${escHtml(h)}`;
+                latSel.add(new Option(t, i)); lonSel.add(new Option(t, i));
+                if (depthSel) depthSel.add(new Option(t, i));
+            });
+            const findCol = (keys) => { for (const k of keys) { const idx = headers.findIndex(h => h.toLowerCase().includes(k)); if (idx >= 0) return String(idx); } return '-1'; };
+            latSel.value = findCol(['lat','latitude','широта','north','northing','n','шир','y']) || '0';
+            lonSel.value = findCol(['lon','long','longitude','долгота','east','easting','e','долг','x']) || (headers.length > 1 ? '1' : '0');
+            if (depthSel) depthSel.value = findCol(['alt','altitude','height','depth','высота','глубина','z','elev','dpt']);
+        }
+
+        // ======== Geo → XYZ ========
+        function handleGeoFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            document.getElementById('geoFileName').textContent = '📄 ' + file.name;
+            const reader = new FileReader();
+            reader.onload = e => { document.getElementById('geoInput').value = e.target.result; parseGeoInput(); };
+            reader.readAsText(file);
+        }
+
+        document.getElementById('geoInput').addEventListener('input', parseGeoInput);
+
+        function parseGeoInput() {
+            const text = document.getElementById('geoInput').value.trim();
+            if (!text) { geoParsedPoints = []; geoHeaders = []; geoRows = []; updateGeoPreview(); return; }
+            if (text.startsWith('<?xml') || text.includes('<kml')) {
+                geoParsedPoints = parseKmlCoords(text);
+                geoHeaders = ['Name','Lat','Lon','Depth'];
+                geoRows = geoParsedPoints.map(p => [p.name, String(p.lat), String(p.lon), String(p.depth)]);
+            } else {
+                const parsed = parseCsvData(text);
+                geoHeaders = parsed.headers; geoRows = parsed.rows; geoParsedPoints = [];
+            }
+            buildColumnSelectors(geoHeaders, 'geoLatCol', 'geoLonCol', 'geoDepthCol');
+            updateGeoCentroid(); updateGeoPreview();
+        }
+
+        function getGeoRefPoint() {
+            const lat = parseFloat(document.getElementById('geoRefLat').value);
+            const lon = parseFloat(document.getElementById('geoRefLon').value);
+            if (!isNaN(lat) && !isNaN(lon)) return { lat, lon };
+            if (geoParsedPoints.length > 0) {
+                let sLat = 0, sLon = 0;
+                geoParsedPoints.forEach(p => { sLat += p.lat; sLon += p.lon; });
+                return { lat: sLat / geoParsedPoints.length, lon: sLon / geoParsedPoints.length };
+            }
+            if (geoRows.length > 0) {
+                const latIdx = parseInt(document.getElementById('geoLatCol').value);
+                const lonIdx = parseInt(document.getElementById('geoLonCol').value);
+                if (isNaN(latIdx) || isNaN(lonIdx)) return null;
+                let sLat = 0, sLon = 0, n = 0;
+                geoRows.forEach(row => {
+                    const lat = parseFloat(row[latIdx]?.replace(',','.'));
+                    const lon = parseFloat(row[lonIdx]?.replace(',','.'));
+                    if (!isNaN(lat) && !isNaN(lon)) { sLat += lat; sLon += lon; n++; }
+                });
+                return n > 0 ? { lat: sLat/n, lon: sLon/n } : null;
+            }
+            return null;
+        }
+
+        function updateGeoCentroid() {
+            const ref = getGeoRefPoint();
+            const info = document.getElementById('geoCentroidInfo');
+            if (ref && document.getElementById('geoRefLat').value === '') {
+                info.textContent = `Центроида: ${ref.lat.toFixed(6)}, ${ref.lon.toFixed(6)}`;
+            } else if (ref) {
+                info.textContent = `Центроида: ${ref.lat.toFixed(6)}, ${ref.lon.toFixed(6)} (переопределено)`;
+            } else {
+                info.textContent = 'Нет данных';
+            }
+        }
+
+        document.getElementById('geoRefLat').addEventListener('input', updateGeoCentroid);
+        document.getElementById('geoRefLon').addEventListener('input', updateGeoCentroid);
+        document.getElementById('geoLatCol').addEventListener('change', () => { updateGeoCentroid(); updateGeoPreview(); });
+        document.getElementById('geoLonCol').addEventListener('change', () => { updateGeoCentroid(); updateGeoPreview(); });
+        document.getElementById('geoDepthCol').addEventListener('change', updateGeoPreview);
+
+        function updateGeoPreview() {
+            const ref = getGeoRefPoint();
+            const tbody = document.getElementById('geoPreviewBody');
+            if (!ref || geoRows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">Загрузите данные</td></tr>';
+                return;
+            }
+            const latIdx = parseInt(document.getElementById('geoLatCol').value);
+            const lonIdx = parseInt(document.getElementById('geoLonCol').value);
+            const depthIdx = parseInt(document.getElementById('geoDepthCol').value);
+            if (isNaN(latIdx) || isNaN(lonIdx)) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);">Выберите столбцы</td></tr>'; return; }
+            const preview = geoRows.slice(0, 20);
+            tbody.innerHTML = preview.map((row, i) => {
+                const lat = parseFloat(row[latIdx]?.replace(',','.'));
+                const lon = parseFloat(row[lonIdx]?.replace(',','.'));
+                const depth = depthIdx >= 0 ? parseFloat(row[depthIdx]?.replace(',','.')) || 0 : 0;
+                if (isNaN(lat) || isNaN(lon)) return `<tr><td>${i+1}</td><td colspan="7" style="color:#f44336;">Нет координат</td></tr>`;
+                const xyz = geoToXyz(lat, lon, depth, ref.lat, ref.lon);
+                return `<tr><td>${i+1}</td><td>${escHtml(row[0]||'')}</td><td>${lat.toFixed(6)}</td><td>${lon.toFixed(6)}</td><td>${depth.toFixed(1)}</td><td>${xyz.x.toFixed(2)}</td><td>${xyz.y.toFixed(2)}</td><td>${xyz.z.toFixed(2)}</td></tr>`;
+            }).join('');
+        }
+
+        function convertGeoToXyz() {
+            const ref = getGeoRefPoint();
+            if (!ref) { showStatus('❌ Не удалось определить опорную точку', 'error'); return; }
+            const latIdx = parseInt(document.getElementById('geoLatCol').value);
+            const lonIdx = parseInt(document.getElementById('geoLonCol').value);
+            const depthIdx = parseInt(document.getElementById('geoDepthCol').value);
+            if (isNaN(latIdx) || isNaN(lonIdx)) { showStatus('❌ Выберите столбцы координат', 'error'); return; }
+            if (geoRows.length === 0) { showStatus('❌ Нет данных', 'error'); return; }
+
+            let csv = `# Ref point: ${ref.lat.toFixed(8)}, ${ref.lon.toFixed(8)}\nName,X_m,Y_m,Z_m\n`;
+            let count = 0;
+            geoRows.forEach(row => {
+                const lat = parseFloat(row[latIdx]?.replace(',','.'));
+                const lon = parseFloat(row[lonIdx]?.replace(',','.'));
+                const depth = depthIdx >= 0 ? parseFloat(row[depthIdx]?.replace(',','.')) || 0 : 0;
+                if (isNaN(lat) || isNaN(lon)) return;
+                const xyz = geoToXyz(lat, lon, depth, ref.lat, ref.lon);
+                const name = (row[0]||'').includes(',') ? `"${row[0]}"` : (row[0] || `Point ${count+1}`);
+                csv += `${name},${xyz.x.toFixed(2)},${xyz.y.toFixed(2)},${xyz.z.toFixed(2)}\n`;
+                count++;
+            });
+            generatedOutput = csv; generatedFileExt = '.csv'; generatedKml = '';
+            document.getElementById('outputData').value = generatedOutput;
+            updateAllButtons(false);
+            showStatus(`✅ Сконвертировано ${count} точек. Ref: ${ref.lat.toFixed(6)}, ${ref.lon.toFixed(6)}`, 'success');
+        }
+
+        // ======== XYZ → Geo ========
+        function handleXyzFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            document.getElementById('xyzFileName').textContent = '📄 ' + file.name;
+            const reader = new FileReader();
+            reader.onload = e => { document.getElementById('xyzInput').value = e.target.result; parseXyzInput(); };
+            reader.readAsText(file);
+        }
+
+        document.getElementById('xyzInput').addEventListener('input', parseXyzInput);
+
+        function parseXyzInput() {
+            const text = document.getElementById('xyzInput').value.trim();
+            if (!text) { xyzHeaders = []; xyzRows = []; updateXyzPreview(); updateXyzPreviewData(); return; }
+            const parsed = parseCsvData(text);
+            xyzHeaders = parsed.headers; xyzRows = parsed.rows;
+            buildColumnSelectors(xyzHeaders, 'xyzXCol', 'xyzYCol', 'xyzZCol');
+            updateXyzPreview(); updateXyzPreviewData();
+        }
+
+        function updateXyzPreviewData() {
+            const xIdx = parseInt(document.getElementById('xyzXCol').value);
+            const yIdx = parseInt(document.getElementById('xyzYCol').value);
+            const zIdx = parseInt(document.getElementById('xyzZCol').value);
+            xyzPreviewData = [];
+            if (isNaN(xIdx) || isNaN(yIdx)) return;
+            xyzRows.forEach(row => {
+                const x = parseFloat(row[xIdx]?.replace(',','.'));
+                const y = parseFloat(row[yIdx]?.replace(',','.'));
+                const z = zIdx >= 0 ? parseFloat(row[zIdx]?.replace(',','.')) || 0 : 0;
+                if (!isNaN(x) && !isNaN(y)) xyzPreviewData.push({x, y, z});
+            });
+            drawXyzPreview();
+        }
+
+        function onHeadingSliderChange() {
+            const val = document.getElementById('xyzHeadingSlider').value;
+            document.getElementById('xyzHeadingValue').textContent = val + '°';
+            document.getElementById('xyzHeading').value = val;
+            drawXyzPreview();
+            updateXyzPreviewTableOnly();
+        }
+
+        document.getElementById('xyzHeading').addEventListener('input', function() {
+            const val = parseFloat(this.value) || 0;
+            document.getElementById('xyzHeadingSlider').value = Math.round(val) % 360;
+            document.getElementById('xyzHeadingValue').textContent = Math.round(val) % 360 + '°';
+            drawXyzPreview();
+            updateXyzPreviewTableOnly();
+        });
+
+        document.getElementById('xyzXCol').addEventListener('change', () => { updateXyzPreview(); updateXyzPreviewData(); });
+        document.getElementById('xyzYCol').addEventListener('change', () => { updateXyzPreview(); updateXyzPreviewData(); });
+        document.getElementById('xyzZCol').addEventListener('change', () => { updateXyzPreview(); updateXyzPreviewData(); });
+        document.getElementById('xyzRefLat').addEventListener('input', () => { updateXyzPreview(); drawXyzPreview(); });
+        document.getElementById('xyzRefLon').addEventListener('input', () => { updateXyzPreview(); drawXyzPreview(); });
+
+        function updateXyzPreviewTableOnly() {
+            const refLat = parseFloat(document.getElementById('xyzRefLat').value);
+            const refLon = parseFloat(document.getElementById('xyzRefLon').value);
+            const heading = parseFloat(document.getElementById('xyzHeading').value) || 0;
+            const xIdx = parseInt(document.getElementById('xyzXCol').value);
+            const yIdx = parseInt(document.getElementById('xyzYCol').value);
+            const zIdx = parseInt(document.getElementById('xyzZCol').value);
+            const tbody = document.getElementById('xyzPreviewBody');
+
+            if (xyzRows.length === 0 || isNaN(xIdx) || isNaN(yIdx)) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">Загрузите данные</td></tr>';
+                return;
+            }
+            if (isNaN(refLat) || isNaN(refLon)) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#f44336;padding:20px;">Введите точку привязки</td></tr>';
+                return;
+            }
+
+            const preview = xyzRows.slice(0, 20);
+            tbody.innerHTML = preview.map((row, i) => {
+                const x = parseFloat(row[xIdx]?.replace(',','.'));
+                const y = parseFloat(row[yIdx]?.replace(',','.'));
+                const z = zIdx >= 0 ? parseFloat(row[zIdx]?.replace(',','.')) || 0 : 0;
+                if (isNaN(x) || isNaN(y)) return `<tr><td>${i+1}</td><td colspan="6" style="color:#f44336;">Нет координат</td></tr>`;
+                const geo = xyzToGeo(x, y, z, refLat, refLon, heading);
+                return `<tr><td>${i+1}</td><td>${x.toFixed(2)}</td><td>${y.toFixed(2)}</td><td>${z.toFixed(2)}</td><td>${geo.lat.toFixed(8)}</td><td>${geo.lon.toFixed(8)}</td><td>${geo.depth.toFixed(1)}</td></tr>`;
+            }).join('');
+        }
+
+        function updateXyzPreview() { updateXyzPreviewTableOnly(); }
+
+        function drawXyzPreview() {
+            const canvas = document.getElementById('xyzPreviewCanvas');
+            if (!canvas || xyzPreviewData.length === 0) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+            ctx.clearRect(0, 0, w, h);
+
+            const refLat = parseFloat(document.getElementById('xyzRefLat').value);
+            const refLon = parseFloat(document.getElementById('xyzRefLon').value);
+            const heading = parseFloat(document.getElementById('xyzHeading').value) || 0;
+
+            if (isNaN(refLat) || isNaN(refLon)) {
+                ctx.fillStyle = '#f44336'; ctx.font = '14px Arial'; ctx.textAlign = 'center';
+                ctx.fillText('Введите точку привязки', w/2, h/2); return;
+            }
+
+            const hdgRad = heading * Math.PI / 180;
+            const cosH = Math.cos(hdgRad), sinH = Math.sin(hdgRad);
+
+            const geoPoints = xyzPreviewData.map(p => ({
+                x: p.x * cosH - p.y * sinH,
+                y: p.x * sinH + p.y * cosH,
+                z: p.z
+            }));
+
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            geoPoints.forEach(p => { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); });
+            minX = Math.min(minX, 0); maxX = Math.max(maxX, 0);
+            minY = Math.min(minY, 0); maxY = Math.max(maxY, 0);
+
+            const pad = 40;
+            const rangeX = maxX - minX || 100, rangeY = maxY - minY || 100;
+            const sc = Math.min((w - pad*2) / rangeX, (h - pad*2) / rangeY);
+            const cx = w/2 - (minX + maxX)/2 * sc;
+            const cy = h/2 + (minY + maxY)/2 * sc;
+            const ts = (wx, wy) => ({ x: cx + wx * sc, y: cy - wy * sc });
+
+            // Сетка
+            ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+            const gridSize = 50;
+            for (let wx = Math.floor(minX/gridSize)*gridSize; wx <= maxX; wx += gridSize) {
+                const s = ts(wx, 0); ctx.beginPath(); ctx.moveTo(s.x, 0); ctx.lineTo(s.x, h); ctx.stroke();
+            }
+            for (let wy = Math.floor(minY/gridSize)*gridSize; wy <= maxY; wy += gridSize) {
+                const s = ts(0, wy); ctx.beginPath(); ctx.moveTo(0, s.y); ctx.lineTo(w, s.y); ctx.stroke();
+            }
+
+            // Оси
+            const o = ts(0, 0);
+            ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(o.x, 0); ctx.lineTo(o.x, h); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, o.y); ctx.lineTo(w, o.y); ctx.stroke();
+
+            // Трек
+            if (geoPoints.length >= 2) {
+                ctx.strokeStyle = '#4caf50'; ctx.lineWidth = 2; ctx.beginPath();
+                const p0 = ts(geoPoints[0].x, geoPoints[0].y); ctx.moveTo(p0.x, p0.y);
+                for (let i = 1; i < geoPoints.length; i++) {
+                    const p = ts(geoPoints[i].x, geoPoints[i].y); ctx.lineTo(p.x, p.y);
+                }
+                ctx.stroke();
+            }
+
+            // Точки трека
+            geoPoints.forEach((p, i) => {
+                const s = ts(p.x, p.y);
+                ctx.fillStyle = i === 0 ? '#ffeb3b' : '#4caf50';
+                ctx.beginPath(); ctx.arc(s.x, s.y, i === 0 ? 4 : 2.5, 0, Math.PI*2); ctx.fill();
+            });
+
+            // Опорная точка
+            ctx.fillStyle = '#f44336'; ctx.beginPath(); ctx.arc(o.x, o.y, 6, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'left';
+            ctx.fillText('Ref', o.x + 10, o.y - 6);
+
+            // Подписи осей
+            ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '10px Arial';
+            ctx.textAlign = 'right'; ctx.fillText('N↑', o.x - 5, 15);
+            ctx.textAlign = 'left'; ctx.fillText('E→', w - 30, o.y - 5);
+
+            // Масштабная линейка
+            const barM = getNiceScale(rangeX, rangeY, w, h);
+            const barPx = barM * sc;
+            const bx = w - barPx - 20, by = h - 20;
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + barPx, by); ctx.stroke();
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center';
+            ctx.fillText(barM >= 1000 ? `${(barM/1000).toFixed(1)} км` : `${Math.round(barM)} м`, bx + barPx/2, by - 8);
+        }
+
+        function getNiceScale(rangeX, rangeY, w, h) {
+            const raw = Math.max(rangeX, rangeY) / Math.max(w, h) * 80;
+            const nice = [1,2,5,10,25,50,100,250,500,1000,2500,5000];
+            return nice.find(n => n >= raw) || 100;
+        }
+
+        function convertXyzToGeo() {
+            const refLat = parseFloat(document.getElementById('xyzRefLat').value);
+            const refLon = parseFloat(document.getElementById('xyzRefLon').value);
+            const heading = parseFloat(document.getElementById('xyzHeading').value) || 0;
+            const xIdx = parseInt(document.getElementById('xyzXCol').value);
+            const yIdx = parseInt(document.getElementById('xyzYCol').value);
+            const zIdx = parseInt(document.getElementById('xyzZCol').value);
+
+            if (isNaN(refLat) || isNaN(refLon)) { showStatus('❌ Введите точку привязки', 'error'); return; }
+            if (isNaN(xIdx) || isNaN(yIdx)) { showStatus('❌ Выберите столбцы X и Y', 'error'); return; }
+            if (xyzRows.length === 0) { showStatus('❌ Нет данных', 'error'); return; }
+
+            xyzConvertedPoints = [];
+            let csv = `# Ref: ${refLat.toFixed(8)}, ${refLon.toFixed(8)}, Heading: ${heading}°\nLatitude,Longitude,Depth_m\n`;
+            let count = 0;
+
+            xyzRows.forEach(row => {
+                const x = parseFloat(row[xIdx]?.replace(',','.'));
+                const y = parseFloat(row[yIdx]?.replace(',','.'));
+                const z = zIdx >= 0 ? parseFloat(row[zIdx]?.replace(',','.')) || 0 : 0;
+                if (isNaN(x) || isNaN(y)) return;
+                const geo = xyzToGeoVincenty(x, y, z, refLat, refLon, heading);
+                csv += `${geo.lat.toFixed(8)},${geo.lon.toFixed(8)},${geo.depth.toFixed(1)}\n`;
+                xyzConvertedPoints.push(geo);
+                count++;
+            });
+
+            if (count > 0) {
+                const coords = xyzConvertedPoints.map(p => `${p.lon.toFixed(8)},${p.lat.toFixed(8)},${p.depth.toFixed(1)}`).join('\n          ');
+                generatedKml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n    <name>XYZ Converted Track</name>\n    <Placemark>\n      <LineString>\n        <coordinates>\n          ${coords}\n        </coordinates>\n      </LineString>\n    </Placemark>\n  </Document>\n</kml>`;
+            }
+
+            generatedOutput = csv; generatedFileExt = '.csv';
+            document.getElementById('outputData').value = generatedOutput;
+            updateAllButtons(false);
+            showStatus(`✅ Сконвертировано ${count} точек (Vincenty). Ref: ${refLat.toFixed(6)}, ${refLon.toFixed(6)}, Hdg: ${heading}°`, 'success');
+        }
+
+        // ======== ВЫВОД ========
+        function downloadOutput() {
+            if (!generatedOutput) { if (currentMode === 'geo2xyz') convertGeoToXyz(); else convertXyzToGeo(); if (!generatedOutput) return; }
+            const blob = new Blob([generatedOutput], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `converted_${Date.now()}${generatedFileExt}`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        function downloadKml() {
+            if (!generatedKml) { convertXyzToGeo(); if (!generatedKml) return; }
+            const blob = new Blob([generatedKml], { type: 'application/vnd.google-earth.kml+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `track_${Date.now()}.kml`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        function copyToClipboard() {
+            if (!generatedOutput) { if (currentMode === 'geo2xyz') convertGeoToXyz(); else convertXyzToGeo(); if (!generatedOutput) return; }
+            navigator.clipboard.writeText(generatedOutput).then(() => showStatus('📋 Скопировано', 'info')).catch(() => showStatus('❌ Ошибка', 'error'));
+        }
+
+        function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+        // ======== PWA ========
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                const swBlob = new Blob([`const C='geo-xyz-v2';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['/']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));`], {type:'application/javascript'});
+                navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
+            });
+        }
+    </script>
+</body>
+</html>
