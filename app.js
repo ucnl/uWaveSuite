@@ -848,6 +848,11 @@ const UWApp = (() => {
             html += `
             <div class="device-card ${cardClass}" onclick="UWApp.focusDeviceByAddress(${device.address}, '${device.type}')">
                 <div class="dc-addr">#${device.userAddress}${device.isUSBL ? ' 📡' : ''}</div>
+				<div class="bc-actions">
+					${!isNaN(device.latitudeDeg) && !isNaN(device.longitudeDeg) ? 
+						`<span class="bc-mark" onclick="event.stopPropagation(); UWApp.markBeaconPoint(${device.address}, '${device.type}')" title="Отметить в POI">📌</span>` 
+						: ''}
+				</div>
                 <div class="dc-range">📏 ${range}</div>
                 <div class="dc-azimuth">🧭 ${azm}</div>
                 <div class="dc-depth">🌊 ${!isNaN(device.depthM) ? device.depthM.toFixed(1) + 'м' : '--'}</div>
@@ -1080,6 +1085,116 @@ const UWApp = (() => {
 			}
 		}
 	}
+
+	// ========== POI ==========
+
+	function loadPOI() {
+		closeAllDropdowns();
+		
+		const input = document.createElement('input');
+		input.type = 'file';
+		input.accept = '.csv,.txt';
+		input.onchange = (e) => {
+			const file = e.target.files[0];
+			if (!file) return;
+			
+			const reader = new FileReader();
+			reader.onload = (ev) => {
+				const count = POIManager.loadFromCSV(ev.target.result);
+				if (count > 0) {
+					addConsoleMessage(`Загружено ${count} POI`, 'success', 'POI');
+					setStatus(`Загружено ${count} POI`);
+					UIMap.draw();
+				} else {
+					alert('Не удалось загрузить POI. Проверьте формат файла.');
+				}
+			};
+			reader.readAsText(file);
+		};
+		input.click();
+	}
+
+	function exportPOI_CSV() {
+		closeAllDropdowns();
+		
+		const points = POIManager.getAll();
+		if (points.length === 0) {
+			alert('Нет POI для экспорта');
+			return;
+		}
+		
+		const lines = ['# uWaveSuite POI Export'];
+		lines.push('# Name,Latitude,Longitude,Depth,Type,Timestamp');
+		lines.push('Name,Latitude,Longitude,Depth,Type,Timestamp');
+		
+		for (const poi of points) {
+			lines.push([
+				poi.name || '',
+				poi.lat.toFixed(8),
+				poi.lon.toFixed(8),
+				poi.depth != null ? poi.depth.toFixed(1) : '',
+				poi.type || 'manual',
+				new Date(poi.timestamp || Date.now()).toISOString()
+			].join(','));
+		}
+		
+		const text = lines.join('\n');
+		const blob = new Blob([text], { type: 'text/csv' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `uwave_poi_${new Date().toISOString().slice(0, 10)}.csv`;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+		
+		addConsoleMessage(`Экспортировано ${points.length} POI`, 'success', 'POI');
+		setStatus(`Экспортировано ${points.length} POI`);
+	}
+
+	function clearPOI() {
+		closeAllDropdowns();
+		
+		const count = POIManager.getCount();
+		if (count === 0) {
+			alert('Нет POI для очистки');
+			return;
+		}
+		
+		if (confirm(`Очистить все POI (${count} шт.)?`)) {
+			POIManager.clear();
+			addConsoleMessage(`Удалено ${count} POI`, 'info', 'POI');
+			setStatus('POI очищены');
+			UIMap.draw();
+		}
+	}
+
+	function markBeaconPoint(address, type = 'cdma') {
+		const device = deviceManager.getDevice(address, type);
+		if (!device) return;
+		
+		const lat = device.latitudeDeg;
+		const lon = device.longitudeDeg;
+		const depth = device.depthM;
+		
+		if (isNaN(lat) || isNaN(lon)) {
+			alert('У устройства ещё нет координат');
+			return;
+		}
+		
+		const now = new Date();
+		const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+		const name = `Маяк #${device.userAddress} — ${timeStr}`;
+		
+		POIManager.addMarkedPoint(name, lat, lon, !isNaN(depth) ? depth : null);
+		
+		addConsoleMessage(`POI добавлен: ${name}`, 'success', 'POI');
+		setStatus(`Отмечено: ${name}`);
+		
+		UIMap.draw();
+	}
+
 
     // ========== ТЕМА ==========
     
@@ -1476,6 +1591,10 @@ const UWApp = (() => {
         stopPlayback,
         increasePlaybackSpeed,
         decreasePlaybackSpeed,
+		loadPOI,
+		exportPOI_CSV,
+		clearPOI,
+		markBeaconPoint,
         loadLog,
         saveLog,
         getState: () => ({

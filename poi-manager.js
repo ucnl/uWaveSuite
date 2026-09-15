@@ -67,7 +67,7 @@ const POIManager = (() => {
     
     function save() {
         try {
-            localStorage.setItem('poi_data', JSON.stringify(points));
+            localStorage.setItem('uwave_poi_data', JSON.stringify(points));
         } catch (e) {
             console.warn('[POI] Не удалось сохранить:', e);
         }
@@ -75,7 +75,7 @@ const POIManager = (() => {
     
     function load() {
         try {
-            const saved = localStorage.getItem('poi_data');
+            const saved = localStorage.getItem('uwave_poi_data');
             if (saved) {
                 points = JSON.parse(saved);
                 if (points.length > 0) {

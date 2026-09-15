@@ -43,6 +43,16 @@
 		<!-- Кнопка Экспорт -->
 		<button class="top-btn btn-export" onclick="UWApp.openExportPanel()">📤 Экспорт</button>
 		
+		<!-- Выпадающая кнопка POI -->
+		<div class="dropdown" style="display:inline-block; position:relative;">
+			<button class="top-btn btn-export" onclick="UWApp.toggleDropdown('poi-dropdown')">📍 POI ▾</button>
+			<div id="poi-dropdown" class="dropdown-menu" style="display:none; position:absolute; top:100%; right:0; z-index:300; min-width:180px;">
+				<div class="dropdown-item" onclick="UWApp.loadPOI(); UWApp.closeAllDropdowns();">📂 Загрузить из CSV</div>
+				<div class="dropdown-item" onclick="UWApp.exportPOI_CSV(); UWApp.closeAllDropdowns();">💾 Сохранить в CSV</div>
+				<div class="dropdown-item" onclick="UWApp.clearPOI(); UWApp.closeAllDropdowns();">🗑 Очистить все</div>
+			</div>
+		</div>
+		
 		<!-- Выпадающая кнопка Лог -->
 		<div class="dropdown" style="display:inline-block; position:relative;">
 			<button class="top-btn btn-log" onclick="UWApp.toggleDropdown('log-dropdown')">📋 Лог ▾</button>
