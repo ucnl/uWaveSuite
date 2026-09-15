@@ -504,75 +504,116 @@ const UIMap = (() => {
         ctx.fillText('Y ↑', xAxis.x + 10, 20);
     }
 
-    function drawDevices() {
-        const deviceManager = getDeviceManager();
-        if (!deviceManager) return;
-        
-        const devices = deviceManager.getAllDevices();
-        
-        for (const device of devices) {
-            let screenX, screenY;
-            
-            if (!isNaN(device.xM) && !isNaN(device.yM)) {
-                // Декартовы координаты
-                const screen = worldToScreen(device.xM, device.yM);
-                screenX = screen.x;
-                screenY = screen.y;
-            } else if (!isNaN(device.latitudeDeg) && !isNaN(device.longitudeDeg)) {
-                // Географические координаты
-                const antennaLat = UWSettingsStorage.get('antenna.latDeg', NaN);
-                const antennaLon = UWSettingsStorage.get('antenna.lonDeg', NaN);
-                
-                if (!isNaN(antennaLat) && !isNaN(antennaLon)) {
-                    const deltas = GeoUtils.deltasByDegrees(
-                        antennaLat, antennaLon,
-                        device.latitudeDeg, device.longitudeDeg
-                    );
-                    
-                    const screen = worldToScreen(deltas.deltaLonM, deltas.deltaLatM);
-                    screenX = screen.x;
-                    screenY = screen.y;
-                } else {
-                    continue;
-                }
-            } else {
-                continue;
-            }
-            
-            // Проверяем видимость
-            const rect = canvas.getBoundingClientRect();
-            if (screenX < -20 || screenX > rect.width + 20 || screenY < -20 || screenY > rect.height + 20) {
-                continue;
-            }
-            
-            // Цвет устройства
-            const color = device.isUSBL ? '#00ff88' : '#4488ff';
-            
-            // Отрисовка точки
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.arc(screenX, screenY, 5, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Подпись
-            if (view.showLabels) {
-                ctx.fillStyle = getComputedStyle(document.documentElement)
-                    .getPropertyValue('--map-text').trim() || '#ffffff';
-                ctx.font = '10px monospace';
-                ctx.fillText(`#${device.userAddress}`, screenX + 8, screenY - 8);
-            }
-            
-            // Таймаут
-            if (device.isTimeout) {
-                ctx.strokeStyle = getComputedStyle(document.documentElement)
-                    .getPropertyValue('--beacon-timeout-color').trim() || '#dc3545';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(screenX, screenY, 8, 0, Math.PI * 2);
-                ctx.stroke();
-            }
-        }
-    }
+	function drawDevices() {
+		const deviceManager = getDeviceManager();
+		if (!deviceManager) return;
+		
+		const devices = deviceManager.getAllDevices();
+		
+		for (const device of devices) {
+			let screenX, screenY;
+			
+			if (!isNaN(device.xM) && !isNaN(device.yM)) {
+				const screen = worldToScreen(device.xM, device.yM);
+				screenX = screen.x;
+				screenY = screen.y;
+			} else if (!isNaN(device.latitudeDeg) && !isNaN(device.longitudeDeg)) {
+				const antennaLat = UWSettingsStorage.get('antenna.latDeg', NaN);
+				const antennaLon = UWSettingsStorage.get('antenna.lonDeg', NaN);
+				
+				if (!isNaN(antennaLat) && !isNaN(antennaLon)) {
+					const deltas = GeoUtils.deltasByDegrees(
+						antennaLat, antennaLon,
+						device.latitudeDeg, device.longitudeDeg
+					);
+					
+					const screen = worldToScreen(deltas.deltaLonM, deltas.deltaLatM);
+					screenX = screen.x;
+					screenY = screen.y;
+				} else {
+					continue;
+				}
+			} else {
+				continue;
+			}
+			
+			const rect = canvas.getBoundingClientRect();
+			if (screenX < -20 || screenX > rect.width + 20 || screenY < -20 || screenY > rect.height + 20) {
+				continue;
+			}
+			
+			// Цвет: USBL — зелёный, обычное — синий
+			const color = device.isUSBL ? '#00ff88' : '#4488ff';
+			
+			ctx.fillStyle = color;
+			ctx.beginPath();
+			ctx.arc(screenX, screenY, 5, 0, Math.PI * 2);
+			ctx.fill();
+			
+			// Подпись USBL
+			if (view.showLabels) {
+				ctx.fillStyle = getComputedStyle(document.documentElement)
+					.getPropertyValue('--map-text').trim() || '#ffffff';
+				ctx.font = '10px monospace';
+				ctx.fillText(`#${device.userAddress}`, screenX + 8, screenY - 8);
+			}
+			
+			// ===== VLBL решение =====
+			if (device.vlbl && !isNaN(device.vlbl.latDeg) && !isNaN(device.vlbl.lonDeg)) {
+				let vlblScreenX, vlblScreenY;
+				
+				const antennaLat = UWSettingsStorage.get('antenna.latDeg', NaN);
+				const antennaLon = UWSettingsStorage.get('antenna.lonDeg', NaN);
+				
+				if (!isNaN(antennaLat) && !isNaN(antennaLon)) {
+					const deltas = GeoUtils.deltasByDegrees(
+						antennaLat, antennaLon,
+						device.vlbl.latDeg, device.vlbl.lonDeg
+					);
+					
+					const screen = worldToScreen(deltas.deltaLonM, deltas.deltaLatM);
+					vlblScreenX = screen.x;
+					vlblScreenY = screen.y;
+				}
+				
+				if (vlblScreenX !== undefined) {
+					// Квадратик оранжевый — VLBL решение
+					ctx.fillStyle = '#ffaa00';
+					ctx.fillRect(vlblScreenX - 4, vlblScreenY - 4, 8, 8);
+					ctx.strokeStyle = '#ffffff';
+					ctx.lineWidth = 1;
+					ctx.strokeRect(vlblScreenX - 4, vlblScreenY - 4, 8, 8);
+					
+					// Подпись
+					if (view.showLabels) {
+						ctx.fillStyle = '#ffaa00';
+						ctx.font = '9px monospace';
+						const quality = device.vlbl.quality || '';
+						ctx.fillText(`VLBL #${device.userAddress}`, vlblScreenX + 6, vlblScreenY + 12);
+					}
+					
+					// Радиальная ошибка (круг)
+					if (!isNaN(device.vlbl.radialError) && device.vlbl.radialError > 0) {
+						ctx.strokeStyle = 'rgba(255, 170, 0, 0.3)';
+						ctx.lineWidth = 1;
+						ctx.beginPath();
+						ctx.arc(vlblScreenX, vlblScreenY, device.vlbl.radialError * view.scale, 0, Math.PI * 2);
+						ctx.stroke();
+					}
+				}
+			}
+			
+			// Таймаут
+			if (device.isTimeout) {
+				ctx.strokeStyle = getComputedStyle(document.documentElement)
+					.getPropertyValue('--beacon-timeout-color').trim() || '#dc3545';
+				ctx.lineWidth = 2;
+				ctx.beginPath();
+				ctx.arc(screenX, screenY, 8, 0, Math.PI * 2);
+				ctx.stroke();
+			}
+		}
+	}
 
     function drawTracks() {
         if (typeof Tracks === 'undefined' || !Tracks.getAll) return;

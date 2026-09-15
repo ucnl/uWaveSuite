@@ -88,6 +88,12 @@ const UISettings = (() => {
         setValue('cfg-tx-ch', UWSettingsStorage.get('device.txChID', 0));
         setValue('cfg-rx-ch', UWSettingsStorage.get('device.rxChID', 0));
         setValue('cfg-salinity', UWSettingsStorage.get('device.salinityPSU', 0));
+		setValue('cfg-gravity', UWSettingsStorage.get('device.gravityAcc', 9.8));
+		
+		const cmdModeEl = document.getElementById('cfg-cmd-mode-default');
+		if (cmdModeEl) {
+			cmdModeEl.checked = UWSettingsStorage.get('device.isCmdMode', true);
+		}
         
         const soundSpeed = UWSettingsStorage.get('antenna.soundSpeedMps', NaN);
         const soundSpeedAuto = UWSettingsStorage.get('antenna.soundSpeedAuto', true);
@@ -197,10 +203,17 @@ const UISettings = (() => {
 		const maxPoints = getInt('cfg-maxpoints', 500);
 		const minPointDist = getFloat('cfg-minpointdist', 0.5);
 		
+		const cmdModeEl = document.getElementById('cfg-cmd-mode-default');
+		const isCmdMode = cmdModeEl ? cmdModeEl.checked : true;
+
+		const gravityAcc = getFloat('cfg-gravity', 9.8);
+
 		UWSettingsStorage.setDeviceSettings({
 			txChID: txCh,
 			rxChID: rxCh,
-			salinityPSU: salinity
+			salinityPSU: salinity,
+			gravityAcc: gravityAcc,
+			isCmdMode: isCmdMode
 		});
 		
 		UWSettingsStorage.setAntennaSettings({
@@ -242,9 +255,9 @@ const UISettings = (() => {
 			if (port && port.isOpen && port.detected) {
 				const sent = port.querySettingsWrite(
 					txCh, rxCh, salinity,
-					UWSettingsStorage.get('device.isCmdMode', true),
+					isCmdMode,
 					UWSettingsStorage.get('device.isACKOnTXFinished', false),
-					UWSettingsStorage.get('device.gravityAcc', 9.8)
+					gravityAcc
 				);
 				
 				if (!sent) {

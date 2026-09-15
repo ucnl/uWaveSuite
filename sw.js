@@ -1,4 +1,4 @@
-const CACHE = 'aws-v1';
+const CACHE = 'uwave-v3';
 
 const ASSETS = [
 	'./',
@@ -24,6 +24,9 @@ const ASSETS = [
 	'./uw-tracking-engine.js',
 	'./uw-usbl-solver.js',
 	'./uw-vlbl-solver.js',
+	'./uw-vlbl-measurements.js',
+	'./uw-vlbl-store.js',
+	'./uw-vlbl-worker.js',
 	'./settings-storage.js',
 	'./tracks.js',
 	'./poi-manager.js',
@@ -46,20 +49,32 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(ASSETS))
-  );
-  self.skipWaiting();
+	event.waitUntil(
+		caches.open(CACHE).then((cache) => cache.addAll(ASSETS))
+	);
+	self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim());
+	event.waitUntil(
+		Promise.all([
+			clients.claim(),
+			// Удаляем старые кэши
+			caches.keys().then((keys) => {
+				return Promise.all(
+					keys.filter((key) => key !== CACHE)
+						.map((key) => caches.delete(key))
+				);
+			})
+		])
+	);
 });
 
 self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request);
-    })
-  );
+		
+	event.respondWith(
+		caches.match(event.request).then((cached) => {
+			return cached || fetch(event.request);
+		})
+	);
 });

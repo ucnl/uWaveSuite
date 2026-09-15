@@ -3,7 +3,7 @@
 
 const UWApp = (() => {
 
-    const APP_VERSION = '0.2.0';
+    const APP_VERSION = '0.3.0';
     const APP_NAME = 'uWaveSuite';
 
     // ========== DOM ЭЛЕМЕНТЫ ==========
@@ -59,6 +59,11 @@ const UWApp = (() => {
         
         // Инициализация UI модулей
         initUIModules();
+		
+		// Загрузка VLBL решений из storage
+		if (typeof UWVLBStore !== 'undefined') {
+			UWVLBStore.loadSolutionsFromStorage();
+		}
         
         // Инициализация обработчиков
         initEventHandlers();
@@ -226,21 +231,26 @@ const UWApp = (() => {
 		});
 	}
 
-    function wireDeviceEvents() {
-        deviceManager.addEventListener('deviceAdded', (e) => {
-            addConsoleMessage(`Устройство обнаружено: #${e.detail.userAddress}`, 'info', 'DEVICE');
-            updateDevicesBar();
-        });
-        
-        deviceManager.addEventListener('deviceUpdated', () => {
-            updateDevicesBar();
-        });
-        
-        deviceManager.addEventListener('deviceTimeout', (e) => {
-            addConsoleMessage(`Таймаут устройства #${e.detail.userAddress}`, 'warning', 'DEVICE');
-            updateDevicesBar();
-        });
-    }
+	function wireDeviceEvents() {
+		deviceManager.addEventListener('deviceAdded', (e) => {
+			addConsoleMessage(`Устройство обнаружено: #${e.detail.userAddress}`, 'info', 'DEVICE');
+			updateDevicesBar();
+		});
+		
+		deviceManager.addEventListener('deviceUpdated', (e) => {
+			updateDevicesBar();
+			
+			// VLBL — записываем измерение если режим включен
+			if (typeof UIVLBL !== 'undefined' && UIVLBL.isVLBLActive()) {
+				UIVLBL.onDeviceUpdated(e.detail);
+			}
+		});
+		
+		deviceManager.addEventListener('deviceTimeout', (e) => {
+			addConsoleMessage(`Таймаут устройства #${e.detail.userAddress}`, 'warning', 'DEVICE');
+			updateDevicesBar();
+		});
+	}
 
     function wireTrackingEvents() {
         trackingEngine.addEventListener('started', (e) => {
@@ -275,13 +285,14 @@ const UWApp = (() => {
         deviceManager.updateLocalDevice(info);
         updateAllButtons();
         
-        UWSettingsStorage.setDeviceSettings({
-            txChID: info.txChID,
-            rxChID: info.rxChID,
-            salinityPSU: info.salinityPSU,
-            acousticBaudrate: info.acousticBaudrate,
-            totalCodeChannels: info.totalCodeChannels
-        });
+		UWSettingsStorage.setDeviceSettings({
+			txChID: info.txChID,
+			rxChID: info.rxChID,
+			salinityPSU: info.salinityPSU,
+			acousticBaudrate: info.acousticBaudrate,
+			totalCodeChannels: info.totalCodeChannels,
+			isCmdMode: info.isCommandModeByDefault
+		});
 		
 		if (typeof UISettings !== 'undefined' && UISettings.updateFieldsFromSettings) {
 			UISettings.updateFieldsFromSettings();
@@ -289,8 +300,8 @@ const UWApp = (() => {
         
         updateDeviceInfo();
         
-        const type = info.isPTS ? 'PTS' : 'RC';
-        deviceLabel.textContent = `uWave ${type} [${info.serialNumber}]`;
+        const sensorInfo = info.isPTS ? ' + PTS' : '';
+		deviceLabel.textContent = `uWave${sensorInfo} [${info.serialNumber}]`;
         
         setStatus('Устройство обнаружено');
         
@@ -428,16 +439,21 @@ const UWApp = (() => {
         updateDevicesBar();
     }
 
-    function handleTrackingResult(data) {
-        const device = data.device;
-        const solved = UWUSBLsolver.solveUSBL(device);
-        
-        if (solved) {
-            addTrackPoint(solved);
-        }
-        
-        updateDevicesBar();
-    }
+	function handleTrackingResult(data) {
+		const device = data.device;
+		const solved = UWUSBLsolver.solveUSBL(device);
+		
+		if (solved) {
+			addTrackPoint(solved);
+		}
+		
+		updateDevicesBar();
+		
+		// VLBL — записываем измерение если режим включен
+		if (typeof UIVLBL !== 'undefined' && UIVLBL.isVLBLActive() && device) {
+			UIVLBL.onDeviceUpdated(device);
+		}
+	}
 
     // ========== ПОДКЛЮЧЕНИЕ ==========
     
@@ -838,8 +854,14 @@ const UWApp = (() => {
                 <div class="dc-msr">📶 ${!isNaN(device.msrDB) ? device.msrDB.toFixed(1) + ' dB' : '--'}</div>
                 <div class="dc-temp">🌡 ${!isNaN(device.temperatureC) ? device.temperatureC.toFixed(1) + ' °C' : '--'}</div>
                 <div class="dc-vcc">🔋 ${!isNaN(device.voltageV) ? device.voltageV.toFixed(1) + ' V' : '--'}</div>
-                <div class="dc-age ${ageClass}">⏱ ${age.toFixed(0)}с${device.isTimeout ? ' ⌛' : ''}</div>
-            </div>`;
+                ${device.vlbl && !isNaN(device.vlbl.latDeg) ? `
+				<div class="dc-vlbl" style="color:#ffaa00; font-size:10px; margin-top:2px;">
+					📡 VLBL: ${device.vlbl.latDeg.toFixed(5)}, ${device.vlbl.lonDeg.toFixed(5)}
+					${!isNaN(device.vlbl.radialError) ? ` (±${device.vlbl.radialError.toFixed(1)}м)` : ''}
+				</div>
+				` : ''}
+				<div class="dc-age ${ageClass}">⏱ ${age.toFixed(0)}с${device.isTimeout ? ' ⌛' : ''}</div>
+							</div>`;
         });
         
         devicesBar.innerHTML = html;

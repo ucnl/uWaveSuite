@@ -1,59 +1,31 @@
 // modules/ui-vlbl.js — Панель VLBL навигации uWaveSuite
-// Автоматический сбор измерений при движении и решение дальномерной задачи
+// Автоматический сбор измерений и решение дальномерной задачи
+// Работает через Worker в фоне
 
 const UIVLBL = (() => {
 
-    // ========== СОСТОЯНИЕ ==========
     let panel = null;
     let listeners = [];
     let isOpen = false;
+    let isActive = false;           // VLBL режим включен
     
-    // Базовые точки (неподвижные модемы на дне)
-    let bases = [];                 // [{ address, name, lat, lon, depth, isFixed }]
+    // Worker
+    let worker = null;
+    let solveRequestCounter = 0;
+    const pendingSolveRequests = new Map();
     
-    // Измерения дальности (автоматически собираются при движении)
-    let rangeMeasurements = [];     // [{ baseAddress, range, antennaLat, antennaLon, antennaDepth, timestamp }]
-    
-    // Решение
-    let solution = {
-        baseAddress: null,
-        latDeg: NaN,
-        lonDeg: NaN,
-        radialError: NaN,
-        hdop: NaN,
-        maxAngularGap: NaN,
-        quality: '--',
-        measurementsUsed: 0,
-        lastUpdateTime: null
-    };
+    // Авторешение
+    let lastAutoSolveTime = {};
+    let lastAutoSolveCount = {};
     
     // Настройки
     let config = {
-        autoCollect: true,          // Автоматический сбор измерений
-        minMeasurements: 3,         // Минимум измерений для решения
-        minDistanceM: 5,            // Минимальная дистанция между точками сбора
-        maxMeasurements: 20,        // Максимум измерений для хранения
-        soundSpeedMps: 1480,        // Скорость звука
-        solverOptions: {
-            maxIterations: 600,
-            precisionThreshold: 1E-12,
-            simplexSize: 1.0
-        }
-    };
-    
-    // Текущая позиция антенны
-    let antennaPosition = {
-        latDeg: NaN,
-        lonDeg: NaN,
-        depthM: NaN,
-        headingDeg: NaN,
-        lastUpdateTime: null
-    };
-    
-    // Последняя точка сбора
-    let lastCollectionPoint = {
-        latDeg: NaN,
-        lonDeg: NaN
+        autoSolveCount: 10,
+        autoSolveMinIntervalMs: 3000,
+        baseSize: 4,
+        maxMeasurements: 200,
+        minDistanceM: 5,
+        enabled: false
     };
 
     // ========== ИНИЦИАЛИЗАЦИЯ ==========
@@ -67,55 +39,110 @@ const UIVLBL = (() => {
         }
         
         loadConfig();
-        loadBases();
         initEventHandlers();
+        initWorker();
         updateUI();
-        
-        // Подписка на события
-        subscribeToEvents();
     }
 
     function initEventHandlers() {
-        const btnAdd = panel.querySelector('#vlbl-btn-add');
+        const btnToggle = panel.querySelector('#vlbl-btn-toggle');
         const btnClear = panel.querySelector('#vlbl-btn-clear');
-        const btnSolve = panel.querySelector('#vlbl-btn-solve');
-        const btnAutoSolve = panel.querySelector('#vlbl-btn-auto-solve');
-        const btnClearMeasurements = panel.querySelector('#vlbl-btn-clear-measurements');
         
-        if (btnAdd) btnAdd.addEventListener('click', () => addBase());
-        if (btnClear) btnClear.addEventListener('click', () => clearBases());
-        if (btnSolve) btnSolve.addEventListener('click', () => solveForSelectedBase());
-        if (btnAutoSolve) btnAutoSolve.addEventListener('click', () => toggleAutoCollect());
-        if (btnClearMeasurements) btnClearMeasurements.addEventListener('click', () => clearMeasurements());
-    }
-
-    function subscribeToEvents() {
-        // Подписка на обновление позиции антенны
-        if (window.UWApp) {
-            // Через USBL solver
-            const checkAntennaPosition = () => {
-                const st = UWUSBLsolver.getState();
-                if (!isNaN(st.antennaLatDeg) && !isNaN(st.antennaLonDeg)) {
-                    antennaPosition.latDeg = st.antennaLatDeg;
-                    antennaPosition.lonDeg = st.antennaLonDeg;
-                    antennaPosition.depthM = st.antennaDepthM;
-                    antennaPosition.headingDeg = st.antennaHeadingDeg;
-                    antennaPosition.lastUpdateTime = Date.now();
-                }
-            };
-            
-            // Запускаем проверку периодически
-            setInterval(checkAntennaPosition, 1000);
+        if (btnToggle) btnToggle.addEventListener('click', toggleVLBL);
+        if (btnClear) btnClear.addEventListener('click', clearAll);
+        
+        // Настройки
+        const autoCountInput = panel.querySelector('#vlbl-auto-count');
+        const minIntervalInput = panel.querySelector('#vlbl-min-interval');
+        const baseSizeInput = panel.querySelector('#vlbl-base-size');
+        const maxMeasInput = panel.querySelector('#vlbl-max-meas');
+        const minDistInput = panel.querySelector('#vlbl-min-dist');
+        
+        if (autoCountInput) {
+            autoCountInput.value = config.autoSolveCount;
+            autoCountInput.addEventListener('change', () => {
+                config.autoSolveCount = parseInt(autoCountInput.value) || 10;
+                saveConfig();
+            });
         }
         
-        // Подписка на результаты трекинга (для автосбора измерений)
-        const deviceManager = window.UWApp ? UWApp.getDeviceManager() : null;
-        if (deviceManager) {
-            deviceManager.addEventListener('deviceUpdated', (e) => {
-                if (config.autoCollect) {
-                    handleDeviceUpdate(e.detail);
-                }
+        if (minIntervalInput) {
+            minIntervalInput.value = config.autoSolveMinIntervalMs;
+            minIntervalInput.addEventListener('change', () => {
+                config.autoSolveMinIntervalMs = parseInt(minIntervalInput.value) || 3000;
+                saveConfig();
             });
+        }
+        
+        if (baseSizeInput) {
+            baseSizeInput.value = config.baseSize;
+            baseSizeInput.addEventListener('change', () => {
+                config.baseSize = parseInt(baseSizeInput.value) || 4;
+                UWVLBStore.setBaseSize(config.baseSize);
+                saveConfig();
+            });
+        }
+        
+        if (maxMeasInput) {
+            maxMeasInput.value = config.maxMeasurements;
+            maxMeasInput.addEventListener('change', () => {
+                config.maxMeasurements = parseInt(maxMeasInput.value) || 200;
+                UWVLBStore.setMaxMeasurementsPerBeacon(config.maxMeasurements);
+                saveConfig();
+            });
+        }
+        
+        if (minDistInput) {
+            minDistInput.value = config.minDistanceM;
+            minDistInput.addEventListener('change', () => {
+                config.minDistanceM = parseFloat(minDistInput.value) || 5;
+                UWVLBStore.setMinStationPointDistance(config.minDistanceM);
+                saveConfig();
+            });
+        }
+    }
+
+    function initWorker() {
+        if (!window.Worker) {
+            console.warn('[UIVLBL] Web Worker не поддерживается');
+            return;
+        }
+        
+        try {
+            worker = new Worker('uw-vlbl-worker.js');
+            worker.onmessage = onWorkerMessage;
+            worker.onerror = (e) => {
+                console.error('[UIVLBL Worker] Ошибка:', e.message);
+                pendingSolveRequests.clear();
+            };
+        } catch (e) {
+            console.warn('[UIVLBL] Worker недоступен:', e.message);
+            worker = null;
+        }
+    }
+
+    function onWorkerMessage(e) {
+        const { action, requestId, result, error, results, errors } = e.data;
+
+        if (action === 'solve_result') {
+            const pending = pendingSolveRequests.get(requestId);
+            if (pending) {
+                const { addr } = pending;
+                pendingSolveRequests.delete(requestId);
+                handleSolution(addr, result);
+            }
+        } else if (action === 'solve_error') {
+            console.warn('[UIVLBL Worker] Ошибка решения:', error);
+            pendingSolveRequests.delete(requestId);
+        } else if (action === 'solve_all_result') {
+            for (const addr in results) {
+                handleSolution(addr, results[addr]);
+            }
+            for (const addr in errors) {
+                console.warn(`[UIVLBL] Маяк #${addr}: ${errors[addr]}`);
+            }
+            pendingSolveRequests.delete(requestId);
+            updateDevicesList();
         }
     }
 
@@ -123,17 +150,14 @@ const UIVLBL = (() => {
     
     function open() {
         if (!panel) return;
-        
         panel.style.display = 'block';
         isOpen = true;
-        
         updateUI();
         notifyListeners('open');
     }
 
     function close() {
         if (!panel) return;
-        
         panel.style.display = 'none';
         isOpen = false;
         notifyListeners('close');
@@ -144,395 +168,318 @@ const UIVLBL = (() => {
         else open();
     }
 
-    // ========== УПРАВЛЕНИЕ БАЗАМИ ==========
+    // ========== ТУМБЛЕР ==========
     
-    function addBase() {
-        if (!panel) return;
+    function toggleVLBL() {
+        isActive = !isActive;
+        config.enabled = isActive;
+        saveConfig();
         
-        const address = parseInt(panel.querySelector('#vlbl-base-address')?.value || bases.length);
-        const name = panel.querySelector('#vlbl-base-name')?.value || `База #${address}`;
-        
-        // Проверяем что база с таким адресом не существует
-        if (bases.find(b => b.address === address)) {
-            showStatus(`База #${address} уже существует`, 'warning');
-            return;
+        if (isActive) {
+            addConsoleMessage('VLBL режим включен', 'info', 'VLBL');
+        } else {
+            addConsoleMessage('VLBL режим выключен', 'info', 'VLBL');
         }
         
-        const base = {
-            address,
-            name,
-            latDeg: NaN,
-            lonDeg: NaN,
-            depthM: NaN,
-            isFixed: false,         // Координаты неизвестны — будем решать
-            measurements: []         // Измерения для этой базы
-        };
-        
-        bases.push(base);
-        saveBases();
         updateUI();
-        
-        showStatus(`База #${address} добавлена`, 'success');
-        notifyListeners('baseAdded', base);
+        notifyListeners('toggled', { isActive });
     }
 
-    function removeBase(address) {
-        const index = bases.findIndex(b => b.address === address);
-        if (index >= 0) {
-            const removed = bases.splice(index, 1)[0];
-            saveBases();
-            updateUI();
-            showStatus(`База #${address} удалена`, 'info');
-            notifyListeners('baseRemoved', removed);
-        }
+    function isVLBLActive() {
+        return isActive;
     }
 
-    function clearBases() {
-        if (bases.length === 0) {
-            showStatus('Нет баз', 'warning');
-            return;
-        }
-        
-        if (!confirm(`Удалить все базы (${bases.length})?`)) return;
-        
-        bases = [];
-        rangeMeasurements = [];
-        saveBases();
-        updateUI();
-        showStatus('Все базы удалены', 'info');
-    }
-
-    // ========== АВТОМАТИЧЕСКИЙ СБОР ИЗМЕРЕНИЙ ==========
+    // ========== ОБРАБОТКА ИЗМЕРЕНИЙ (вызывается из app.js) ==========
     
-    function handleDeviceUpdate(device) {
-        // Проверяем что это база
-        const base = bases.find(b => b.address === device.address);
-        if (!base) return;
+    function onDeviceUpdated(device) {
+        if (!isActive) return;
         
-        // Проверяем что у нас есть позиция антенны
-        if (isNaN(antennaPosition.latDeg) || isNaN(antennaPosition.lonDeg)) {
-            return;
-        }
+        // Проверяем GNSS
+        if (typeof UWUSBLsolver === 'undefined') return;
         
-        // Проверяем что у устройства есть дальность
-        if (isNaN(device.slantRangeM) && isNaN(device.absoluteDistanceM)) {
-            return;
-        }
+        const st = UWUSBLsolver.getState();
+        if (isNaN(st.antennaLatDeg) || isNaN(st.antennaLonDeg)) return;
         
-        const range = !isNaN(device.slantRangeM) ? device.slantRangeM : device.absoluteDistanceM;
+        // Определяем дальность
+        const range = !isNaN(device.slantRangeProjectionM) && device.slantRangeProjectionM > 0
+            ? device.slantRangeProjectionM
+            : device.absoluteDistanceM;
         
-        // Проверяем минимальную дистанцию от последней точки сбора
-        if (!isNaN(lastCollectionPoint.latDeg) && !isNaN(lastCollectionPoint.lonDeg)) {
-            const dist = GeoUtils.haversineDistance(
-                lastCollectionPoint.latDeg, lastCollectionPoint.lonDeg,
-                antennaPosition.latDeg, antennaPosition.lonDeg
-            );
-            
-            if (dist < config.minDistanceM) {
-                return; // Слишком близко к предыдущей точке
-            }
-        }
+        if (isNaN(range) || range <= 0) return;
         
         // Добавляем измерение
-        const measurement = {
-            baseAddress: base.address,
+        UWVLBStore.addMeasurement(
+            device.address,
+            st.antennaLatDeg,
+            st.antennaLonDeg,
+            st.antennaDepthM || 0,
+            device.depthM || 0,
             range,
-            antennaLatDeg: antennaPosition.latDeg,
-            antennaLonDeg: antennaPosition.lonDeg,
-            antennaDepthM: antennaPosition.depthM || 0,
-            timestamp: Date.now()
-        };
+            Date.now()
+        );
         
-        base.measurements.push(measurement);
-        rangeMeasurements.push(measurement);
+        // Авторешение
+        checkAutoSolve(device.address);
         
-        // Ограничиваем количество
-        if (base.measurements.length > config.maxMeasurements) {
-            base.measurements.shift();
+        // Обновляем UI если панель открыта
+        if (isOpen) {
+            updateDevicesList();
         }
-        
-        // Обновляем точку сбора
-        lastCollectionPoint.latDeg = antennaPosition.latDeg;
-        lastCollectionPoint.lonDeg = antennaPosition.lonDeg;
-        
-        // Пытаемся решить автоматически
-        if (base.measurements.length >= config.minMeasurements) {
-            solveForBase(base.address, false);
-        }
-        
-		if (isOpen) {
-			updateUI();
-			showStatus(`Измерение для #${base.address}: ${range.toFixed(1)} м`, 'info');
-			}
     }
 
-    function toggleAutoCollect() {
-        config.autoCollect = !config.autoCollect;
-        saveConfig();
-        updateUI();
+    function checkAutoSolve(addr) {
+        if (config.autoSolveCount === 0) return;
         
-        showStatus(config.autoCollect ? 'Автосбор включен' : 'Автосбор выключен', 'info');
+        const count = UWVLBStore.getMeasurementCount(addr);
+        const lastCount = lastAutoSolveCount[addr] || 0;
+        const now = Date.now();
+        const lastTime = lastAutoSolveTime[addr] || 0;
+        
+        if ((count - lastCount >= config.autoSolveCount) &&
+            (now - lastTime >= config.autoSolveMinIntervalMs)) {
+            
+            const measurements = UWVLBStore.getMeasurements(addr);
+            if (!measurements || !measurements.isBaseExists) return;
+            
+            lastAutoSolveCount[addr] = count;
+            lastAutoSolveTime[addr] = now;
+            
+            solveBeaconAsync(addr);
+        }
     }
 
-    function clearMeasurements() {
-        for (const base of bases) {
-            base.measurements = [];
-        }
-        rangeMeasurements = [];
-        lastCollectionPoint = { latDeg: NaN, lonDeg: NaN };
-        
-        updateUI();
-        showStatus('Измерения очищены', 'info');
-    }
-
-    // ========== РЕШЕНИЕ ==========
-    
-    function solveForSelectedBase() {
-        if (!panel) return;
-        
-        const select = panel.querySelector('#vlbl-solve-base');
-        if (!select || select.value === '') {
-            showStatus('Выберите базу', 'warning');
-            return;
-        }
-        
-        const address = parseInt(select.value);
-        solveForBase(address, true);
-    }
-
-    function solveForBase(address, showAlert = true) {
-        const base = bases.find(b => b.address === address);
-        if (!base) return;
-        
-        if (base.measurements.length < config.minMeasurements) {
-            if (showAlert) {
-                showStatus(`Нужно минимум ${config.minMeasurements} измерений (сейчас ${base.measurements.length})`, 'warning');
-            }
-            return;
-        }
-        
-        // Формируем данные для решателя
-        const basePoints = base.measurements.map(m => ({
-            lat: m.antennaLatDeg,
-            lon: m.antennaLonDeg,
-            depth: m.antennaDepthM,
-            range: m.range
-        }));
-        
-        // Глубина базы (если известна, иначе 0)
-        const beaconDepth = base.depthM || 0;
-        
-        // Предыдущее решение
-        const prevLat = base.latDeg;
-        const prevLon = base.lonDeg;
+    function solveBeaconAsync(addr) {
+        const measurements = UWVLBStore.getMeasurements(addr);
+        if (!measurements || !measurements.isBaseExists) return;
         
         try {
-            const result = UWVLBLsolver.locate2D(
-                basePoints,
-                prevLat,
-                prevLon,
-                beaconDepth,
-                config.solverOptions
-            );
+            const base = measurements.getBase();
+            if (base.length < 3) return;
             
-            // Сохраняем решение
-            base.latDeg = result.latDeg;
-            base.lonDeg = result.lonDeg;
-            base.isFixed = true;
+            const deviceManager = getDeviceManager();
+            const device = deviceManager ? deviceManager.getDevice(addr, 'cdma') : null;
+            const beaconDepth = device && !isNaN(device.depthM) ? device.depthM : 0;
             
-            solution = {
-                baseAddress: base.address,
-                latDeg: result.latDeg,
-                lonDeg: result.lonDeg,
-                radialError: result.radialError,
-                hdop: result.hdop,
-                maxAngularGap: result.maxAngularGap,
-                quality: result.quality,
-                measurementsUsed: base.measurements.length,
-                lastUpdateTime: Date.now()
-            };
+            const prevSolution = UWVLBStore.getSolution(addr);
             
-            updateUI();
-            showStatus(`База #${base.address}: ${result.latDeg.toFixed(6)}, ${result.lonDeg.toFixed(6)} (±${result.radialError.toFixed(2)}м)`, 'success');
+            const bases = base.map(m => ({ 
+                lat: m.lat, 
+                lon: m.lon, 
+                depth: m.depth, 
+                range: m.range 
+            }));
             
-            notifyListeners('solved', { base, solution });
-            
-        } catch (error) {
-            showStatus('Ошибка решения: ' + error.message, 'error');
+            if (worker) {
+                const requestId = `solve_${++solveRequestCounter}_${addr}`;
+                pendingSolveRequests.set(requestId, { addr });
+                
+                worker.postMessage({
+                    action: 'solve',
+                    data: {
+                        requestId,
+                        bases,
+                        prevLat: prevSolution ? prevSolution.latDeg : NaN,
+                        prevLon: prevSolution ? prevSolution.lonDeg : NaN,
+                        beaconDepth,
+                        options: {}
+                    }
+                });
+            } else {
+                // Fallback — синхронно
+                const result = UWVLBLsolver.locate2D(
+                    bases,
+                    prevSolution ? prevSolution.latDeg : NaN,
+                    prevSolution ? prevSolution.lonDeg : NaN,
+                    beaconDepth,
+                    {}
+                );
+                handleSolution(addr, result);
+            }
+        } catch (e) {
+            console.warn(`[UIVLBL] Маяк #${addr}: ${e.message}`);
         }
     }
 
-    // ========== ОБНОВЛЕНИЕ UI ==========
+    function handleSolution(addr, result) {
+        result.depthM = result.depthM || 0;
+        UWVLBStore.setSolution(addr, result);
+        UWVLBStore.saveSolutionsToStorage();
+        
+        // Пишем в device
+        const deviceManager = getDeviceManager();
+        if (deviceManager) {
+            const device = deviceManager.getDevice(addr, 'cdma');
+            if (device) {
+                device.vlbl = {
+                    latDeg: result.latDeg,
+                    lonDeg: result.lonDeg,
+                    depthM: result.depthM,
+                    radialError: result.radialError,
+                    hdop: result.hdop,
+                    quality: result.quality,
+                    maxAngularGap: result.maxAngularGap,
+                    timestamp: Date.now()
+                };
+                
+                deviceManager._emit('deviceUpdated', device);
+            }
+        }
+        
+        // Лог
+        addConsoleMessage(
+            `VLBL #${addr}: ${result.latDeg.toFixed(6)}, ${result.lonDeg.toFixed(6)} ` +
+            `(±${result.radialError.toFixed(1)}м, ${result.quality}, HDOP=${result.hdop?.toFixed(2) || '--'})`,
+            'success', 'VLBL'
+        );
+        
+        // Обновляем UI
+        if (isOpen) updateDevicesList();
+        
+        notifyListeners('solved', { addr, result });
+    }
+
+    // ========== ОЧИСТКА ==========
     
-    function updateUI() {
-        if (!panel) return;
+    function clearAll() {
+        if (!confirm('Очистить все измерения и решения VLBL?')) return;
         
-        updateBasesList();
-        updateMeasurementsList();
-        updateSolutionUI();
-        updateStatus();
-        updateAutoCollectButton();
+        UWVLBStore.clearAll();
+        UWVLBStore.clearStationTrack();
+        
+        lastAutoSolveTime = {};
+        lastAutoSolveCount = {};
+        
+        updateDevicesList();
+        addConsoleMessage('VLBL данные очищены', 'info', 'VLBL');
     }
 
-    function updateBasesList() {
-        if (!panel) return;
-        
-        const listEl = panel.querySelector('#vlbl-bases-list');
-        if (!listEl) return;
-        
-        if (bases.length === 0) {
-            listEl.innerHTML = '<span style="color:var(--text-muted);">Нет баз. Добавьте адреса неподвижных модемов.</span>';
-            return;
-        }
-        
-        listEl.innerHTML = bases.map(base => {
-            const coords = base.isFixed 
-                ? `${base.latDeg.toFixed(6)}, ${base.lonDeg.toFixed(6)}`
-                : 'Не определено';
-            
-            return `
-                <div class="vlbl-base-row">
-                    <span class="vlbl-base-addr">#${base.address}</span>
-                    <span class="vlbl-base-coords">${coords}</span>
-                    <span class="vlbl-base-measurements">${base.measurements.length} изм.</span>
-                    <button onclick="UIVLBL.removeBase(${base.address})" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;">✕</button>
-                </div>
-            `;
-        }).join('');
-        
-        // Обновляем селектор для решения
-        const solveSelect = panel.querySelector('#vlbl-solve-base');
-        if (solveSelect) {
-            solveSelect.innerHTML = '<option value="">Выберите базу...</option>' + 
-                bases.map(b => `<option value="${b.address}">#${b.address} (${b.measurements.length} изм.)</option>`).join('');
-        }
-    }
+    // ========== UI ==========
+    
+	function updateUI() {
+		if (!panel) return;
+		
+		updateToggleButton();
+		updateStatus();
+		updateDevicesList();
+		updateTopBarIndicator();
+	}
 
-    function updateMeasurementsList() {
-        if (!panel) return;
-        
-        const listEl = panel.querySelector('#vlbl-measurements');
-        if (!listEl) return;
-        
-        if (rangeMeasurements.length === 0) {
-            listEl.innerHTML = '<span style="color:var(--text-muted);">Нет измерений. Плавайте вокруг баз — измерения собираются автоматически.</span>';
-            return;
-        }
-        
-        listEl.innerHTML = rangeMeasurements.slice(-10).map((m, index) => {
-            return `
-                <div class="vlbl-measurement-row">
-                    <span>#${m.baseAddress}</span>
-                    <span>${m.range.toFixed(1)} м</span>
-                    <span>${m.antennaLatDeg.toFixed(5)}, ${m.antennaLonDeg.toFixed(5)}</span>
-                </div>
-            `;
-        }).join('');
-    }
+	function updateTopBarIndicator() {
+		const indicator = document.getElementById('vlbl-indicator');
+		if (indicator) {
+			indicator.style.display = isActive ? 'inline-block' : 'none';
+		}
+	}
 
-    function updateSolutionUI() {
-        if (!panel) return;
-        
-        const solutionEl = panel.querySelector('#vlbl-solution');
-        if (!solutionEl) return;
-        
-        if (isNaN(solution.latDeg) || isNaN(solution.lonDeg)) {
-            solutionEl.innerHTML = '<span style="color:var(--text-muted);">Решение не найдено</span>';
-            return;
-        }
-        
-        const qualityColor = {
-            'Good': 'var(--border-success)',
-            'Fair': 'var(--border-warning)',
-            'Poor': 'var(--text-warning)',
-            'Out_of_base': 'var(--border-danger)'
-        };
-        
-        solutionEl.innerHTML = `
-            <div class="vlbl-solution-row">
-                <span>База:</span>
-                <span>#${solution.baseAddress}</span>
-            </div>
-            <div class="vlbl-solution-row">
-                <span>Широта:</span>
-                <span>${solution.latDeg.toFixed(8)}</span>
-            </div>
-            <div class="vlbl-solution-row">
-                <span>Долгота:</span>
-                <span>${solution.lonDeg.toFixed(8)}</span>
-            </div>
-            <div class="vlbl-solution-row">
-                <span>Точность:</span>
-                <span>±${solution.radialError.toFixed(2)} м</span>
-            </div>
-            <div class="vlbl-solution-row">
-                <span>HDOP:</span>
-                <span>${!isNaN(solution.hdop) ? solution.hdop.toFixed(2) : '--'}</span>
-            </div>
-            <div class="vlbl-solution-row">
-                <span>Угловой разрыв:</span>
-                <span>${solution.maxAngularGap.toFixed(1)}°</span>
-            </div>
-            <div class="vlbl-solution-row">
-                <span>Качество:</span>
-                <span style="color:${qualityColor[solution.quality] || 'var(--text-primary)'};">${solution.quality}</span>
-            </div>
-            <div class="vlbl-solution-row">
-                <span>Измерений:</span>
-                <span>${solution.measurementsUsed}</span>
-            </div>
-        `;
-    }
-
-    function updateStatus() {
-        if (!panel) return;
-        
-        const statusEl = panel.querySelector('#vlbl-status');
-        if (!statusEl) return;
-        
-        const totalMeasurements = bases.reduce((sum, b) => sum + b.measurements.length, 0);
-        
-        let status = `Баз: ${bases.length}, Измерений: ${totalMeasurements}`;
-        
-        if (config.autoCollect) {
-            status += ' | Автосбор: ВКЛ';
-        }
-        
-        if (!isNaN(antennaPosition.latDeg) && !isNaN(antennaPosition.lonDeg)) {
-            status += ' | GNSS: OK';
-        } else {
-            status += ' | GNSS: нет';
-        }
-        
-        statusEl.textContent = status;
-        statusEl.className = 'vlbl-status info';
-    }
-
-    function updateAutoCollectButton() {
-        if (!panel) return;
-        
-        const btn = panel.querySelector('#vlbl-btn-auto-solve');
+    function updateToggleButton() {
+        const btn = panel.querySelector('#vlbl-btn-toggle');
         if (!btn) return;
         
-        btn.textContent = config.autoCollect ? '⏸ Автосбор: ВКЛ' : '▶ Автосбор: ВЫКЛ';
-        btn.className = config.autoCollect ? 'btn-reset-topo' : 'btn-apply-topo';
+        if (isActive) {
+            btn.textContent = '⏸ Выключить VLBL';
+            btn.className = 'btn-reset-topo';
+        } else {
+            btn.textContent = '▶ Включить VLBL';
+            btn.className = 'btn-get-gnss';
+        }
         btn.style.width = '100%';
-        btn.style.marginTop = '8px';
+        btn.style.marginBottom = '16px';
     }
 
-    // ========== СТАТУС ==========
-    
-    function showStatus(message, type = 'info') {
-        if (!panel) return;
+	function updateStatus() {
+		const statusEl = panel.querySelector('#vlbl-status');
+		if (!statusEl) return;
+		
+		// Проверяем реальное подключение GNSS
+		let gnssOk = false;
+		
+		if (window.UWApp && window.UWApp.getState) {
+			const appState = window.UWApp.getState();
+			gnssOk = appState.isGnssConnected === true;
+		}
+		
+		// Или если GNSS встроенный (телефон) — проверим свежесть данных
+		if (!gnssOk && typeof UWUSBLsolver !== 'undefined') {
+			const st = UWUSBLsolver.getState();
+			// Свежие данные — обновлялись за последние 5 секунд
+			const lastUpdate = st.lastUpdateTime || 0;
+			const isFresh = (Date.now() - lastUpdate) < 5000;
+			gnssOk = !isNaN(st.antennaLatDeg) && !isNaN(st.antennaLonDeg) && isFresh;
+		}
+		
+		let text = '';
+		let className = 'vlbl-status info';
+		
+		if (isActive) {
+			text = 'VLBL: ВКЛ';
+			if (gnssOk) {
+				text += ' | GNSS: OK';
+				className = 'vlbl-status success';
+			} else {
+				text += ' | GNSS: нет';
+				className = 'vlbl-status warning';
+			}
+		} else {
+			text = 'VLBL: ВЫКЛ';
+		}
+		
+		statusEl.textContent = text;
+		statusEl.className = className;
+	}
+
+    function updateDevicesList() {
+        const listEl = panel.querySelector('#vlbl-devices-list');
+        if (!listEl) return;
         
-        const statusEl = panel.querySelector('#vlbl-status');
-        if (!statusEl) return;
+        const deviceManager = getDeviceManager();
+        if (!deviceManager) {
+            listEl.innerHTML = '<span style="color:var(--text-muted);">Нет устройства</span>';
+            return;
+        }
         
-        statusEl.textContent = message;
-        statusEl.className = 'vlbl-status ' + type;
+        const devices = deviceManager.getAllDevices();
+        
+        if (devices.length === 0) {
+            listEl.innerHTML = '<span style="color:var(--text-muted);">Нет устройств в трекинге</span>';
+            return;
+        }
+        
+        listEl.innerHTML = devices.map(device => {
+            const count = UWVLBStore.getMeasurementCount(device.address);
+            const solution = UWVLBStore.getSolution(device.address);
+            const measurements = UWVLBStore.getMeasurements(device.address);
+            
+            let solutionText = 'Сбор...';
+            let qualityClass = '';
+            
+            if (solution) {
+                solutionText = `${solution.latDeg.toFixed(5)}, ${solution.lonDeg.toFixed(5)}`;
+                if (solution.radialError) {
+                    solutionText += ` (±${solution.radialError.toFixed(1)}м)`;
+                }
+                qualityClass = solution.quality === 'Good' ? 'success' :
+                              solution.quality === 'Fair' ? 'warning' : 'error';
+            } else if (measurements && measurements.isBaseExists) {
+                solutionText = 'Готово к решению';
+            } else if (count > 0) {
+                solutionText = `Сбор (${count})`;
+            }
+            
+            return `
+                <div style="padding:6px 4px; border-bottom:1px solid var(--border-primary);">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-weight:600; color:var(--text-accent);">#${device.userAddress || device.address}</span>
+                        <span style="color:var(--text-secondary); font-size:10px;">${count} изм.</span>
+                    </div>
+                    <div style="font-size:10px; color:var(--text-secondary); margin-top:2px; font-family:'Consolas',monospace;">
+                        ${solutionText}
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
-    // ========== ЗАГРУЗКА/СОХРАНЕНИЕ ==========
+    // ========== НАСТРОЙКИ ==========
     
     function loadConfig() {
         try {
@@ -541,6 +488,11 @@ const UIVLBL = (() => {
                 config = { ...config, ...JSON.parse(saved) };
             }
         } catch (e) {}
+        
+        // Применяем к Store
+        UWVLBStore.setBaseSize(config.baseSize);
+        UWVLBStore.setMaxMeasurementsPerBeacon(config.maxMeasurements);
+        UWVLBStore.setMinStationPointDistance(config.minDistanceM);
     }
 
     function saveConfig() {
@@ -549,45 +501,35 @@ const UIVLBL = (() => {
         } catch (e) {}
     }
 
-    function loadBases() {
-        try {
-            const saved = localStorage.getItem('uwave_vlbl_bases');
-            if (saved) {
-                bases = JSON.parse(saved);
-            }
-        } catch (e) {}
-    }
-
-    function saveBases() {
-        try {
-            localStorage.setItem('uwave_vlbl_bases', JSON.stringify(bases));
-        } catch (e) {}
-    }
-
-    // ========== ПУБЛИЧНЫЙ API ==========
+    // ========== ЗАВИСИМОСТИ ==========
     
-    return {
-        init,
-        open,
-        close,
-        toggle,
-        addBase,
-        removeBase,
-        clearBases,
-        clearMeasurements,
-        solveForBase,
-        solveForSelectedBase,
-        toggleAutoCollect,
-        getSolution: () => solution,
-        getBases: () => bases,
-        getMeasurements: () => rangeMeasurements,
-        subscribe: (listener) => {
-            listeners.push(listener);
-            return () => {
-                listeners = listeners.filter(l => l !== listener);
-            };
+    function getDeviceManager() {
+        if (window.UWApp && window.UWApp.getDeviceManager) {
+            return window.UWApp.getDeviceManager();
         }
-    };
+        return null;
+    }
+
+    function addConsoleMessage(message, type = 'info', source = '') {
+        if (typeof UIConsole !== 'undefined') {
+            switch (type) {
+                case 'info': UIConsole.addInfo(message, source); break;
+                case 'success': UIConsole.addSuccess(message, source); break;
+                case 'warning': UIConsole.addWarning(message, source); break;
+                case 'error': UIConsole.addError(message, source); break;
+                default: UIConsole.addInfo(message, source); break;
+            }
+        }
+    }
+
+    // ========== ПОДПИСКА ==========
+    
+    function subscribe(listener) {
+        listeners.push(listener);
+        return () => {
+            listeners = listeners.filter(l => l !== listener);
+        };
+    }
 
     function notifyListeners(event, data = {}) {
         for (const listener of listeners) {
@@ -598,6 +540,21 @@ const UIVLBL = (() => {
             }
         }
     }
+
+    // ========== ПУБЛИЧНЫЙ API ==========
+    
+    return {
+        init,
+        open,
+        close,
+        toggle,
+        toggleVLBL,
+        isVLBLActive,
+        onDeviceUpdated,
+        clearAll,
+        getConfig: () => ({ ...config }),
+        subscribe
+    };
 
 })();
 

@@ -23,7 +23,7 @@ class UWDeviceManager extends EventTarget {
         // Параметры логической адресации
         this.logical = {
             localAddress: 0,                // Наш адрес (0-255)
-            isPTS: false,                   // Packet Transport Service
+            isPTS: false,                  
             broadcastAddress: 255           // Широковещательный адрес
         };
         
@@ -69,16 +69,18 @@ class UWDeviceManager extends EventTarget {
      */
     updateLocalDevice(dinfo) {
         this.localDevice = {
-            serialNumber: dinfo.serialNumber,
-            systemMoniker: dinfo.systemMoniker,
-            systemVersion: dinfo.systemVersion,
-            coreMoniker: dinfo.coreMoniker,
-            coreVersion: dinfo.coreVersion,
-            acousticBaudrate: dinfo.acousticBaudrate,
-            salinityPSU: dinfo.salinityPSU,
-            isUSBL: this._detectUSBL(dinfo),
-            isValid: true
-        };
+			serialNumber: dinfo.serialNumber,
+			systemMoniker: dinfo.systemMoniker,
+			systemVersion: dinfo.systemVersion,
+			coreMoniker: dinfo.coreMoniker,
+			coreVersion: dinfo.coreVersion,
+			acousticBaudrate: dinfo.acousticBaudrate,
+			salinityPSU: dinfo.salinityPSU,
+			isPTS: dinfo.isPTS,
+			isCommandModeByDefault: dinfo.isCommandModeByDefault,
+			isUSBL: this._detectUSBL(dinfo),
+			isValid: true
+		};
         
         this.cdma.rxChID = dinfo.rxChID;
         this.cdma.txChID = dinfo.txChID;
@@ -165,18 +167,19 @@ class UWDeviceManager extends EventTarget {
     /**
      * Удалить устройство
      */
-    removeDevice(address, type = 'cdma') {
-        const key = this._makeKey(address, type);
-        
-        if (this.devices.has(key)) {
-            const device = this.devices.get(key);
-            this.devices.delete(key);
-            this._emit('deviceRemoved', device);
-            return true;
-        }
-        
-        return false;
-    }
+	removeDevice(address, type = 'cdma', rxChID = null) {
+		const rx = rxChID !== null ? rxChID : address;
+		const key = this._makeKey(address, type, rx);
+		
+		if (this.devices.has(key)) {
+			const device = this.devices.get(key);
+			this.devices.delete(key);
+			this._emit('deviceRemoved', device);
+			return true;
+		}
+		
+		return false;
+	}
 
     /**
      * Получить устройство
@@ -338,36 +341,38 @@ class UWDeviceManager extends EventTarget {
     /**
      * Добавить устройство в трекинг
      */
-    addTrackingDevice(address, type = 'cdma') {
-        const device = this.getOrCreateDevice(address, type);
-        
-        if (!this.trackingConfig.devices.find(d => d.address === address && d.type === type)) {
-            this.trackingConfig.devices.push({ address, type });
-            this._emit('trackingDeviceAdded', { address, type });
-        }
-        
-        return device;
-    }
+	addTrackingDevice(address, type = 'cdma', rxChID = null) {
+		const rx = rxChID !== null ? rxChID : address;
+		const device = this.getOrCreateDevice(address, type, rx);
+		
+		if (!this.trackingConfig.devices.find(d => 
+			d.address === address && d.type === type && 
+			(d.rxChID === undefined ? rx : d.rxChID) === rx)) {
+			this.trackingConfig.devices.push({ address, type, rxChID: rx });
+			this._emit('trackingDeviceAdded', { address, type, rxChID: rx });
+		}
+		
+		return device;
+	}
 
-    /**
-     * Удалить устройство из трекинга
-     */
-    removeTrackingDevice(address, type = 'cdma') {
-        this.trackingConfig.devices = this.trackingConfig.devices.filter(
-            d => !(d.address === address && d.type === type)
-        );
-        
-        this._emit('trackingDeviceRemoved', { address, type });
-    }
+	removeTrackingDevice(address, type = 'cdma', rxChID = null) {
+		const rx = rxChID !== null ? rxChID : address;
+		this.trackingConfig.devices = this.trackingConfig.devices.filter(
+			d => !(d.address === address && d.type === type && 
+				  (d.rxChID === undefined ? d.address : d.rxChID) === rx)
+		);
+		
+		this._emit('trackingDeviceRemoved', { address, type, rxChID: rx });
+	}
 
     /**
      * Получить список устройств для трекинга
      */
-    getTrackingDevices() {
-        return this.trackingConfig.devices.map(d => {
-            return this.getDevice(d.address, d.type);
-        }).filter(d => d !== null);
-    }
+	getTrackingDevices() {
+		return this.trackingConfig.devices.map(d => {
+			return this.getDevice(d.address, d.type, d.rxChID); 
+		}).filter(d => d !== null);
+	}
 
     // ======================== ВОЗРАСТ ДАННЫХ ========================
     
@@ -387,16 +392,6 @@ class UWDeviceManager extends EventTarget {
     }
 
     // ======================== НАСТРОЙКИ ========================
-    
-    /**
-     * Установить режим адресации
-     */
-    setAddressingMode(mode) {
-        if (mode === 'cdma' || mode === 'logical') {
-            this.addressingMode = mode;
-            this._emit('addressingModeChanged', mode);
-        }
-    }
 
     /**
      * Установить CDMA каналы
@@ -526,8 +521,11 @@ class UWDeviceManager extends EventTarget {
         if (state.devices) {
             this.devices.clear();
             for (const device of state.devices) {
-                this.devices.set(this._makeKey(device.address, device.type), device);
-            }
+				this.devices.set(
+					this._makeKey(device.address, device.type, device.rxChID), 
+					device
+				);
+			}
         }
         
         if (state.cdma) this.cdma = state.cdma;

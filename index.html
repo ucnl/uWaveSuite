@@ -16,6 +16,7 @@
 	<!-- ===== ВЕРХНЯЯ ПАНЕЛЬ ===== -->
 	<div id="top-bar">
 		<div id="connection-indicator" title="Статус соединения"></div>
+		<div id="vlbl-indicator" title="VLBL режим" style="display:none; padding:2px 6px; background:var(--btn-export); color:#000; border-radius:3px; font-size:10px; font-weight:700;">VLBL</div>
 		<span id="device-label">uWave</span>
 		<span id="status-text">Не подключено</span>
 		
@@ -203,7 +204,7 @@
 		
 		<!-- Пакетные запросы -->
 		<div class="settings-section" style="margin-top:16px;">
-			<h4>📦 Пакетный запрос (логический)</h4>
+			<h4>📦 Передача пакета</h4>
 			<div class="settings-row">
 				<label>Адрес:</label>
 				<input type="number" id="pt-addr" value="0" min="0" max="255">
@@ -227,7 +228,7 @@
 		
 		<!-- Запрос данных -->
 		<div class="settings-section" style="margin-top:16px;">
-			<h4>🔍 Запрос данных (ITG)</h4>
+			<h4>🔍 Короткий запрос (логический)</h4>
 			<div class="settings-row">
 				<label>Адрес:</label>
 				<input type="number" id="pt-itg-addr" value="0" min="0" max="255">
@@ -338,55 +339,35 @@
 	</div>
 
 	<!-- Панель адресации -->
-	<div id="addressing-panel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--btn-settings); border-radius:12px; padding:20px; z-index:100; min-width:350px; max-height:80vh; overflow-y:auto; backdrop-filter:blur(10px);">
-		<h3 style="color:var(--btn-settings); text-align:center; margin-bottom:16px;">🔢 Адресация</h3>
+	<div id="addressing-panel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--btn-settings); border-radius:12px; padding:20px; z-index:100; min-width:320px; backdrop-filter:blur(10px);">
+		<h3 style="color:var(--btn-settings); text-align:center; margin-bottom:16px;">🔢 Логический адрес</h3>
 		
 		<!-- Статус -->
 		<div id="addr-status" style="text-align:center; font-size:12px; margin-bottom:12px; min-height:18px;"></div>
 		
-		<!-- PTS статус -->
-		<div style="text-align:center; margin-bottom:12px;">
-			<span style="font-size:11px; color:var(--text-secondary);">PTS: </span>
-			<span id="addr-pts-status" style="font-size:11px; font-weight:600;">--</span>
-		</div>
-		
-		<!-- Режим адресации -->
-		<div class="settings-section">
-			<h4>⚙ Режим</h4>
-			<div class="settings-row">
-				<label>Режим:</label>
-				<select id="addr-mode" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
-					<option value="cdma">📻 CDMA (кодовые каналы)</option>
-					<option value="logical">🔢 Логический (адреса 0-255)</option>
-				</select>
-			</div>
-			
-			<!-- Информация о режиме -->
-			<div id="addr-mode-info" style="font-size:11px; margin-top:8px; padding:8px; background:var(--bg-tertiary); border-radius:4px;"></div>
-			
-			<button id="addr-btn-mode-toggle" class="btn-get-gnss" style="width:100%; margin-top:8px;">🔄 Переключить режим</button>
-		</div>
-		
 		<!-- Локальный адрес -->
 		<div class="settings-section">
-			<h4>📍 Локальный адрес</h4>
+			<h4>📍 Адрес локального модема</h4>
+			
 			<div class="settings-row">
 				<label>Адрес:</label>
 				<input type="number" id="addr-local-address" value="0" min="0" max="255">
 			</div>
 			
-			<!-- Информация об адресе -->
-			<div id="addr-info" style="font-size:11px; margin-top:8px; padding:8px; background:var(--bg-tertiary); border-radius:4px;"></div>
+			<div style="font-size:11px; color:var(--text-muted); margin-top:4px; line-height: 1.5;">
+				0-254 — индивидуальный адрес<br>
+				255 — широковещательный (без ACK)
+			</div>
 			
-			<div class="settings-row" style="margin-top:8px;">
+			<div class="settings-row" style="margin-top:12px;">
 				<label>Сохранить:</label>
 				<input type="checkbox" id="addr-save-flash" style="width:16px; height:16px;">
-				<span style="font-size:11px; color:var(--text-secondary);">Во flash</span>
+				<span style="font-size:11px; color:var(--text-secondary);">Во flash (энергонезависимо)</span>
 			</div>
 		</div>
 		
 		<!-- Кнопки -->
-		<div style="display:flex; gap:8px; margin-top:12px;">
+		<div style="display:flex; gap:8px; margin-top:16px;">
 			<button id="addr-btn-apply" class="btn-apply-topo" style="flex:1;">✓ Применить</button>
 			<button id="addr-btn-read" class="btn-get-gnss" style="flex:1;">📖 Читать</button>
 		</div>
@@ -394,67 +375,62 @@
 		<!-- Закрыть -->
 		<button onclick="UIAddressing.close()" class="btn-cancel-topo" style="width:100%; margin-top:12px;">✕ Закрыть</button>
 	</div>
-
+	
 	<!-- Панель VLBL -->
-	<div id="vlbl-panel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--btn-export); border-radius:12px; padding:20px; z-index:100; min-width:400px; max-height:80vh; overflow-y:auto; backdrop-filter:blur(10px);">
-		<h3 style="color:var(--btn-export); text-align:center; margin-bottom:16px;">📡 VLBL Навигация</h3>
+	<div id="vlbl-panel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--btn-export); border-radius:12px; padding:20px; z-index:100; min-width:420px; max-height:80vh; overflow-y:auto; backdrop-filter:blur(10px);">
+		<h3 style="color:var(--btn-export); text-align:center; margin-bottom:16px;">📡 VLBL (дальномерный режим)</h3>
+		
+		<!-- Описание -->
+		<div style="font-size:11px; color:var(--text-secondary); margin-bottom:12px; line-height:1.5; padding:8px; background:var(--bg-tertiary); border-radius:4px;">
+			Определение координат маяков по дальностям с разных точек.
+			Требуется GNSS и движение вокруг маяков.
+		</div>
 		
 		<!-- Статус -->
 		<div id="vlbl-status" style="text-align:center; font-size:12px; margin-bottom:12px; min-height:18px;"></div>
 		
-		<!-- Автосбор -->
-		<button id="vlbl-btn-auto-solve" class="btn-apply-topo" style="width:100%; margin-bottom:16px;">▶ Автосбор: ВЫКЛ</button>
+		<!-- Тумблер -->
+		<button id="vlbl-btn-toggle" class="btn-get-gnss" style="width:100%; margin-bottom:16px;">▶ Включить VLBL</button>
 		
-		<!-- Базы (неподвижные модемы) -->
+		<!-- Настройки -->
 		<div class="settings-section">
-			<h4>📍 Базы (неподвижные модемы)</h4>
-			
+			<h4>⚙ Настройки</h4>
 			<div class="settings-row">
-				<label>Адрес:</label>
-				<input type="number" id="vlbl-base-address" placeholder="Авто" min="0" max="255">
+				<label>Решение каждые:</label>
+				<input type="number" id="vlbl-auto-count" value="10" min="3" max="100" step="1">
+				<span style="font-size:11px; color:var(--text-secondary);">изм.</span>
 			</div>
 			<div class="settings-row">
-				<label>Имя:</label>
-				<input type="text" id="vlbl-base-name" placeholder="База">
+				<label>Мин. интервал:</label>
+				<input type="number" id="vlbl-min-interval" value="3000" min="500" max="60000" step="500">
+				<span style="font-size:11px; color:var(--text-secondary);">мс</span>
 			</div>
-			
-			<button id="vlbl-btn-add" class="btn-apply-topo" style="width:100%; margin-top:8px;">+ Добавить базу</button>
-			
-			<!-- Список баз -->
-			<div id="vlbl-bases-list" style="margin-top:8px; padding:8px; background:var(--bg-tertiary); border-radius:4px; font-size:11px;"></div>
-			
-			<button id="vlbl-btn-clear" class="btn-reset-topo" style="width:100%; margin-top:8px;">🗑 Очистить все</button>
-		</div>
-		
-		<!-- Измерения -->
-		<div class="settings-section">
-			<h4>📏 Измерения (автоматически)</h4>
-			
-			<!-- Список измерений -->
-			<div id="vlbl-measurements" style="padding:8px; background:var(--bg-tertiary); border-radius:4px; font-size:11px; max-height:150px; overflow-y:auto;"></div>
-			
-			<button id="vlbl-btn-clear-measurements" class="btn-cancel-topo" style="width:100%; margin-top:8px;">🗑 Очистить измерения</button>
-		</div>
-		
-		<!-- Решение -->
-		<div class="settings-section">
-			<h4>🎯 Решение</h4>
-			
 			<div class="settings-row">
-				<label>База:</label>
-				<select id="vlbl-solve-base" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
-					<option value="">Выберите базу...</option>
-				</select>
+				<label>Размер базы:</label>
+				<input type="number" id="vlbl-base-size" value="4" min="3" max="20" step="1">
 			</div>
-			
-			<button id="vlbl-btn-solve" class="btn-apply-topo" style="width:100%; margin-top:8px;">🔍 Решить позицию</button>
-			
-			<!-- Результат -->
-			<div id="vlbl-solution" style="margin-top:8px; padding:8px; background:var(--bg-tertiary); border-radius:4px; font-size:11px;"></div>
+			<div class="settings-row">
+				<label>Макс. измерений:</label>
+				<input type="number" id="vlbl-max-meas" value="200" min="10" max="1000" step="10">
+			</div>
+			<div class="settings-row">
+				<label>Мин. дистанция:</label>
+				<input type="number" id="vlbl-min-dist" value="5" min="0" max="100" step="0.5">
+				<span style="font-size:11px; color:var(--text-secondary);">м</span>
+			</div>
 		</div>
 		
-		<!-- Закрыть -->
-		<button onclick="UIVLBL.close()" class="btn-cancel-topo" style="width:100%; margin-top:12px;">✕ Закрыть</button>
+		<!-- Список устройств -->
+		<div class="settings-section">
+			<h4>📡 Устройства</h4>
+			<div id="vlbl-devices-list" style="max-height:300px; overflow-y:auto; padding:4px; background:var(--bg-tertiary); border-radius:4px; font-size:11px;"></div>
+		</div>
+		
+		<!-- Кнопки -->
+		<div style="display:flex; gap:8px; margin-top:12px;">
+			<button id="vlbl-btn-clear" class="btn-reset-topo" style="flex:1;">🗑 Очистить</button>
+			<button onclick="UIVLBL.close()" class="btn-cancel-topo" style="flex:1;">✕ Закрыть</button>
+		</div>
 	</div>
 
 	<!-- Панель устройств -->
@@ -620,7 +596,7 @@
 			<div class="footer-info">
 				<span class="footer-copy">&copy; 2026 UC&NL</span>
 				<span class="footer-desc">Pure Open Source</span>
-				<span>v<span id="app-version">--</span></span>
+				<a href="CHANGELOG.html" target="_blank" class="footer-link" title="История изменений">v<span id="app-version">--</span></a>
 			</div>
 		</div>
 	</footer>
@@ -648,10 +624,19 @@
                         <label>Солёность:</label>
                         <input type="number" id="cfg-salinity" value="0" min="0" max="40" step="0.1">
                     </div>
+					<div class="settings-row">
+						<label>g (м/с²):</label>
+						<input type="number" id="cfg-gravity" value="9.8" min="9.7" max="9.9" step="0.001">
+					</div>
                     <div class="settings-row">
                         <label>Скорость звука:</label>
                         <input type="number" id="cfg-soundspeed" placeholder="Авто" min="1300" max="1800" step="0.1">
                     </div>
+					<div class="settings-row">
+						<label>Командный режим:</label>
+						<input type="checkbox" id="cfg-cmd-mode-default" style="width:16px; height:16px;">
+						<span style="font-size:11px; color:var(--text-secondary);">По умолчанию</span>
+					</div>
                 </div>
                 
                 <!-- Секция: GNSS -->
@@ -749,6 +734,8 @@
 	<script src="uw-queue-manager.js"></script>
 	<script src="uw-device-manager.js"></script>
 	<script src="uw-tracking-engine.js"></script>
+	<script src="uw-vlbl-measurements.js"></script>
+    <script src="uw-vlbl-store.js"></script>    
 	<script src="uw-usbl-solver.js"></script>
 	<script src="uw-vlbl-solver.js"></script>
 	<script src="settings-storage.js"></script>
@@ -787,7 +774,6 @@
 	  });
 	}
 	</script>
-	
-	
+
 </body>
 </html>
