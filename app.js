@@ -226,12 +226,12 @@ const UWApp = (() => {
 		
 		uwPort.addEventListener('packetRequestTimeout', (e) => {
 			handlePacketRequestTimeout(e.detail);
-			UIChat.addOutgoing('timeout', e.detail);   // или новый тип 'itg-timeout'
+			UIChat.addOutgoing('itg-timeout', e.detail);
 		});
 
 		uwPort.addEventListener('packetResponse', (e) => {
 			handlePacketResponse(e.detail);
-			UIChat.addIncoming('response', e.detail);   // или 'itg-response'
+			UIChat.addIncoming('itg-response', e.detail);
 		});
 		
 		

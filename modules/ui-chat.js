@@ -333,7 +333,12 @@ const UIChat = (() => {
         let html = '';
         
         for (const msg of filtered) {
-            html += renderMessage(msg);
+            try {
+                html += renderMessage(msg);
+            } catch (e) {
+                console.warn('[UIChat] renderMessage error:', e.message, msg);
+                html += `<div class="chat-message" style="color:var(--border-danger); margin-bottom:6px;">[ошибка рендера: ${escapeHtml(e.message)}]</div>`;
+            }
         }
         
         messagesEl.innerHTML = html;
@@ -430,25 +435,27 @@ const UIChat = (() => {
             return msg.text;
         }
         
-        const d = msg.data;
+        const d = msg.data || {};
         
         // Входящее ASYNC
         if (msg.type === 'async') {
             let text = `ASYNC_IN: cmd=${d.rcCmdID}`;
-            if (!isNaN(d.msrDb)) text += `, msr=${d.msrDb.toFixed(1)} dB`;
-            if (!isNaN(d.azimuthDeg)) text += `, az=${d.azimuthDeg.toFixed(1)}°`;
+            if (Number.isFinite(d.msrDb)) text += `, msr=${d.msrDb.toFixed(1)} dB`;
+            if (Number.isFinite(d.azimuthDeg)) text += `, az=${d.azimuthDeg.toFixed(1)}°`;
             return text;
         }
         
         // Входящий/исходящий пакет
         if (msg.type === 'packet') {
-            const addr = d.targetPtAddress !== undefined ? d.targetPtAddress : '?';
+            const addr = (d.targetPtAddress !== undefined && d.targetPtAddress !== null)
+                ? d.targetPtAddress
+                : '?';
             
             let text = msg.direction === 'incoming' ? `PKT от #${addr}` : `PKT → #${addr}`;
             
-            if (!isNaN(d.azimuthDeg)) text += `, az=${d.azimuthDeg.toFixed(1)}°`;
-            if (d.triesTaken !== undefined) text += ` (попыток: ${d.triesTaken})`;
-            if (d.maxTries !== undefined) text += ` (попыток: ${d.maxTries})`;
+            if (Number.isFinite(d.azimuthDeg)) text += `, az=${d.azimuthDeg.toFixed(1)}°`;
+            if (d.triesTaken !== undefined && d.triesTaken !== null) text += ` (попыток: ${d.triesTaken})`;
+            if (d.maxTries !== undefined && d.maxTries !== null) text += ` (попыток: ${d.maxTries})`;
             
             // Данные пакета
             if (d.dataPacket) {
@@ -479,55 +486,78 @@ const UIChat = (() => {
         // Исходящий ITG
         if (msg.type === 'itg') {
             const dataNames = ['DPT', 'TMP', 'BAT'];
-            const name = dataNames[d.dataId] || `ID${d.dataId}`;
+            const name = (d.dataId >= 0 && d.dataId <= 2) ? dataNames[d.dataId] : `ID${d.dataId}`;
             return `ITG → #${d.targetPtAddress}, ${name}`;
         }
         
         // Ответ на запрос
         if (msg.type === 'response') {
-            let text = `Ответ #${d.userAddress || d.txChID || '?'}`;
-            if (!isNaN(d.value)) text += `, value=${d.value.toFixed(2)}`;
-            if (!isNaN(d.azimuthDeg)) text += `, az=${d.azimuthDeg.toFixed(1)}°`;
-            if (!isNaN(d.msrDb)) text += `, msr=${d.msrDb.toFixed(1)} dB`;
+            const addr = d.userAddress !== undefined ? d.userAddress :
+                         d.txChID !== undefined ? d.txChID : '?';
+            let text = `Ответ #${addr}`;
+            if (Number.isFinite(d.value)) text += `, value=${d.value.toFixed(2)}`;
+            if (Number.isFinite(d.azimuthDeg)) text += `, az=${d.azimuthDeg.toFixed(1)}°`;
+            if (Number.isFinite(d.msrDb)) text += `, msr=${d.msrDb.toFixed(1)} dB`;
             return text;
         }
         
-        // Таймаут
+        // Таймаут (RC)
         if (msg.type === 'timeout') {
-            return `Таймаут #${d.txChID || '?'} (cmd=${d.rcCmdID || '?'})`;
+            const tx = (d.txChID === undefined || d.txChID === null || d.txChID < 0) ? '?' : d.txChID;
+            const cmd = (d.rcCmdID === undefined || d.rcCmdID === null || d.rcCmdID < 0) ? '?' : d.rcCmdID;
+            return `Таймаут Tx=${tx} cmd=${cmd}`;
         }
-		
-		// Пакет доставлен
-		if (msg.type === 'packet-delivered') {
-			let text = `PKT доставлен #${d.targetPtAddress}`;
-			if (d.triesTaken !== undefined) text += ` (попыток: ${d.triesTaken})`;
-			if (!isNaN(d.azimuthDeg)) text += `, az=${d.azimuthDeg.toFixed(1)}°`;
-			return text;
-		}
+        
+        // Пакет доставлен
+        if (msg.type === 'packet-delivered') {
+            const addr = (d.targetPtAddress === undefined || d.targetPtAddress === null || d.targetPtAddress < 0)
+                ? '?'
+                : d.targetPtAddress;
+            let text = `PKT доставлен #${addr}`;
+            if (d.triesTaken !== undefined && d.triesTaken !== null && d.triesTaken >= 0) {
+                text += ` (попыток: ${d.triesTaken})`;
+            }
+            if (Number.isFinite(d.azimuthDeg)) text += `, az=${d.azimuthDeg.toFixed(1)}°`;
+            return text;
+        }
 
-		// Пакет не доставлен
-		if (msg.type === 'packet-failed') {
-			let text = `PKT НЕ доставлен #${d.targetPtAddress}`;
-			if (d.triesTaken !== undefined) text += ` (попыток: ${d.triesTaken})`;
-			return text;
-		}
-		
-		if (msg.type === 'itg-timeout') {
-			let text = `ITG ТАЙМАУТ #${d.targetPtAddress}`;
-			if (d.dataId !== undefined) text += ` (dataId=${d.dataId})`;
-			return text;
-		}
+        // Пакет не доставлен
+        if (msg.type === 'packet-failed') {
+            const addr = (d.targetPtAddress === undefined || d.targetPtAddress === null || d.targetPtAddress < 0)
+                ? '?'
+                : d.targetPtAddress;
+            let text = `PKT НЕ доставлен #${addr}`;
+            if (d.triesTaken !== undefined && d.triesTaken !== null && d.triesTaken >= 0) {
+                text += ` (попыток: ${d.triesTaken})`;
+            }
+            return text;
+        }
+        
+        // ITG таймаут
+        if (msg.type === 'itg-timeout') {
+            const addr = (d.targetPtAddress === undefined || d.targetPtAddress === null || d.targetPtAddress < 0)
+                ? '?'
+                : d.targetPtAddress;
+            let text = `ITG ТАЙМАУТ #${addr}`;
+            if (d.dataId !== undefined && d.dataId !== null && d.dataId >= 0) {
+                text += ` (dataId=${d.dataId})`;
+            }
+            return text;
+        }
 
-		if (msg.type === 'itg-response') {
-			let text = `ITG ответ #${d.targetPtAddress}`;
-			if (d.dataId !== undefined) text += ` dataId=${d.dataId}`;
-			if (Number.isFinite(d.dataValue)) text += ` value=${d.dataValue.toFixed(2)}`;
-			if (Number.isFinite(d.azimuthDeg)) text += ` az=${d.azimuthDeg.toFixed(1)}°`;
-			return text;
-		}
-		
-		
-		
+        // ITG ответ
+        if (msg.type === 'itg-response') {
+            const addr = (d.targetPtAddress === undefined || d.targetPtAddress === null || d.targetPtAddress < 0)
+                ? '?'
+                : d.targetPtAddress;
+            let text = `ITG ответ #${addr}`;
+            if (d.dataId !== undefined && d.dataId !== null && d.dataId >= 0) {
+                text += ` dataId=${d.dataId}`;
+            }
+            if (Number.isFinite(d.dataValue)) text += ` value=${d.dataValue.toFixed(2)}`;
+            if (Number.isFinite(d.azimuthDeg)) text += ` az=${d.azimuthDeg.toFixed(1)}°`;
+            return text;
+        }
         
         return JSON.stringify(d);
     }
@@ -640,10 +670,17 @@ const UIChat = (() => {
         try {
             const saved = localStorage.getItem(STORAGE_KEY);
             if (saved) {
-                messages = JSON.parse(saved);
+                const parsed = JSON.parse(saved);
+                // Фильтруем битые сообщения
+                messages = (Array.isArray(parsed) ? parsed : []).filter(
+                    msg => msg && typeof msg === 'object'
+                );
             }
         } catch (e) {
             console.warn('[UIChat] Не удалось загрузить:', e);
+            messages = [];
+            // Стираем битые данные, чтобы не падать каждый раз
+            try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
         }
     }
 
