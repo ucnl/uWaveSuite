@@ -17,6 +17,8 @@ const UIChat = (() => {
     
     const MAX_MESSAGES = 200;
     const STORAGE_KEY = 'uwave_chat_messages';
+	
+	let uwPort = null; 
 
     // ========== ИНИЦИАЛИЗАЦИЯ ==========
     
@@ -108,6 +110,28 @@ const UIChat = (() => {
     function toggle() {
         if (isOpen) close();
         else open();
+    }
+
+
+	/**
+     * Установка порта (вызывается из app.js при инициализации)
+     */
+    function setPort(port) {
+        uwPort = port;
+    }
+    
+    /**
+     * Получение порта — приоритет у прямой ссылки,
+     * fallback на window.UWApp для совместимости
+     */
+    function getPort() {
+        if (uwPort) return uwPort;
+        
+        // Fallback (на случай, если setPort не был вызван)
+        if (window.UWApp && window.UWApp.getPort) {
+            return window.UWApp.getPort();
+        }
+        return null;
     }
 
     // ========== ОТПРАВКА ==========
@@ -638,6 +662,7 @@ const UIChat = (() => {
         init,
         open,
         close,
+		setPort,
         toggle,
         isOpen: () => isOpen,
         addIncoming,

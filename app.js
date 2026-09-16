@@ -89,6 +89,10 @@ const UWApp = (() => {
         deviceManager = new UWDeviceManager();
         queueManager = new UWQueueManager(uwPort);
         trackingEngine = new UWTrackingEngine(uwPort, queueManager, deviceManager);
+		
+		if (typeof UIChat !== 'undefined' && UIChat.setPort) {
+        UIChat.setPort(uwPort);
+    }
         
         wirePortEvents();
         wireQueueEvents();
