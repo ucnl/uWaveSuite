@@ -581,68 +581,71 @@ const UWApp = (() => {
         updateAllButtons();
     }
 
-    function onGnssMessage(rawLine) {
-        const line = rawLine.trim();
-        
-        if (UWSettingsStorage.get('antenna.mode') === 'cartesian_fixed') {
-            return;
-        }
-        
-        const data = GNSSParser.parse(line);
-        if (!data) return;
-        
-        if (data.type === 'rmc' && !isNaN(data.latitude) && !isNaN(data.longitude)) {
-            UWSettingsStorage.set('antenna.latDeg', data.latitude);
-            UWSettingsStorage.set('antenna.lonDeg', data.longitude);
-            
-            UWUSBLsolver.setAntennaPosition(
-                data.latitude,
-                data.longitude,
-                UWSettingsStorage.get('antenna.headingDeg', 0)
-            );
-            
-            if (!isNaN(data.speedMps)) {
-                UWUSBLsolver.setSpeedCourse(data.speedMps, data.course);
-            }
-            
-            if (typeof UITopo !== 'undefined' && UITopo.isPanelOpen()) {
-                UITopo.updateFieldsFromGNSS(data.latitude, data.longitude, null);
-            }
-            
-            updateAntennaInfo();
-            
-        } else if (data.type === 'hdt' && !isNaN(data.heading)) {
-            hasTrueHeading = true;
-            UWSettingsStorage.set('antenna.headingDeg', data.heading);
-            
-            const lat = UWSettingsStorage.get('antenna.latDeg', NaN);
-            const lon = UWSettingsStorage.get('antenna.lonDeg', NaN);
-            
-            if (!isNaN(lat) && !isNaN(lon)) {
-                UWUSBLsolver.setAntennaPosition(lat, lon, data.heading);
-            }
-            
-            if (typeof UITopo !== 'undefined' && UITopo.isPanelOpen()) {
-                UITopo.updateFieldsFromGNSS(NaN, NaN, data.heading);
-            }
-            
-            updateAntennaInfo();
-            
-        } else if (data.type === 'hdm' && !isNaN(data.heading)) {
-            if (shouldUseHeading('hdm')) {
-                UWSettingsStorage.set('antenna.headingDeg', data.heading);
-                
-                const lat = UWSettingsStorage.get('antenna.latDeg', NaN);
-                const lon = UWSettingsStorage.get('antenna.lonDeg', NaN);
-                
-                if (!isNaN(lat) && !isNaN(lon)) {
-                    UWUSBLsolver.setAntennaPosition(lat, lon, data.heading);
-                }
-                
-                updateAntennaInfo();
-            }
-        }
-    }
+	function onGnssMessage(rawLine) {
+		const line = rawLine.trim();
+		
+		const data = GNSSParser.parse(line);
+		if (!data) return;
+		
+		// ВСЕГДА обновляем топопривязку, если панель открыта
+		if (typeof UITopo !== 'undefined' && UITopo.isPanelOpen()) {
+			if (data.type === 'rmc' && !isNaN(data.latitude) && !isNaN(data.longitude)) {
+				UITopo.updateFieldsFromGNSS(data.latitude, data.longitude, NaN);
+			} else if ((data.type === 'hdt' || data.type === 'hdm') && !isNaN(data.heading)) {
+				UITopo.updateFieldsFromGNSS(NaN, NaN, data.heading);
+			}
+		}
+		
+		// Если режим cartesian_fixed — не обновляем solver (там позиция = 0,0)
+		if (UWSettingsStorage.get('antenna.mode') === 'cartesian_fixed') {
+			return;
+		}
+		
+		// Дальше — обновление solver и UI антенны в географическом режиме
+		if (data.type === 'rmc' && !isNaN(data.latitude) && !isNaN(data.longitude)) {
+			UWSettingsStorage.set('antenna.latDeg', data.latitude);
+			UWSettingsStorage.set('antenna.lonDeg', data.longitude);
+			
+			UWUSBLsolver.setAntennaPosition(
+				data.latitude,
+				data.longitude,
+				UWSettingsStorage.get('antenna.headingDeg', 0)
+			);
+			
+			if (!isNaN(data.speedMps)) {
+				UWUSBLsolver.setSpeedCourse(data.speedMps, data.course);
+			}
+			
+			updateAntennaInfo();
+			
+		} else if (data.type === 'hdt' && !isNaN(data.heading)) {
+			hasTrueHeading = true;
+			UWSettingsStorage.set('antenna.headingDeg', data.heading);
+			
+			const lat = UWSettingsStorage.get('antenna.latDeg', NaN);
+			const lon = UWSettingsStorage.get('antenna.lonDeg', NaN);
+			
+			if (!isNaN(lat) && !isNaN(lon)) {
+				UWUSBLsolver.setAntennaPosition(lat, lon, data.heading);
+			}
+			
+			updateAntennaInfo();
+			
+		} else if (data.type === 'hdm' && !isNaN(data.heading)) {
+			if (shouldUseHeading('hdm')) {
+				UWSettingsStorage.set('antenna.headingDeg', data.heading);
+				
+				const lat = UWSettingsStorage.get('antenna.latDeg', NaN);
+				const lon = UWSettingsStorage.get('antenna.lonDeg', NaN);
+				
+				if (!isNaN(lat) && !isNaN(lon)) {
+					UWUSBLsolver.setAntennaPosition(lat, lon, data.heading);
+				}
+				
+				updateAntennaInfo();
+			}
+		}
+	}
 
     function shouldUseHeading(type) {
         switch (compassMode) {
@@ -841,30 +844,30 @@ const UWApp = (() => {
         }
     }
 
-    function updateAntennaInfo() {
-        const st = UWUSBLsolver.getState();
-        
-        const latEl = document.getElementById('ai-lat');
-        const lonEl = document.getElementById('ai-lon');
-        const hdgEl = document.getElementById('ai-hdg');
-        const dptEl = document.getElementById('ai-dpt');
-        const tmpEl = document.getElementById('ai-tmp');
-        
-        if (!latEl || !lonEl || !hdgEl) return;
-        
-        if (st.antennaMode === 'cartesian_fixed') {
-            latEl.textContent = 'Y=0.00';
-            lonEl.textContent = 'X=0.00';
-            hdgEl.textContent = '0.0';
-        } else {
-            latEl.textContent = isNaN(st.antennaLatDeg) ? '--' : st.antennaLatDeg.toFixed(6);
-            lonEl.textContent = isNaN(st.antennaLonDeg) ? '--' : st.antennaLonDeg.toFixed(6);
-            hdgEl.textContent = isNaN(st.antennaHeadingDeg) ? '--' : st.antennaHeadingDeg.toFixed(1);
-        }
-        
-        if (dptEl) dptEl.textContent = isNaN(st.antennaDepthM) ? '--' : st.antennaDepthM.toFixed(1);
-        if (tmpEl) tmpEl.textContent = isNaN(st.waterTempC) ? '--' : st.waterTempC.toFixed(1);
-    }
+	function updateAntennaInfo() {
+		const st = UWUSBLsolver.getState();
+		
+		const latEl = document.getElementById('ai-lat');
+		const lonEl = document.getElementById('ai-lon');
+		const hdgEl = document.getElementById('ai-hdg');
+		const dptEl = document.getElementById('ai-dpt');
+		const tmpEl = document.getElementById('ai-tmp');
+		
+		if (!latEl || !lonEl || !hdgEl) return;
+		
+		if (st.antennaMode === 'cartesian_fixed') {
+			latEl.textContent = 'Y=0.00';
+			lonEl.textContent = 'X=0.00';
+			hdgEl.textContent = '0.0';
+		} else {
+			latEl.textContent = isNaN(st.antennaLatDeg) ? '--' : st.antennaLatDeg.toFixed(6);
+			lonEl.textContent = isNaN(st.antennaLonDeg) ? '--' : st.antennaLonDeg.toFixed(6);
+			hdgEl.textContent = isNaN(st.antennaHeadingDeg) ? '--' : st.antennaHeadingDeg.toFixed(1);
+		}
+		
+		if (dptEl) dptEl.textContent = isNaN(st.antennaDepthM) ? '--' : st.antennaDepthM.toFixed(1);
+		if (tmpEl) tmpEl.textContent = isNaN(st.waterTempC) ? '--' : st.waterTempC.toFixed(1);
+	}
 
     function updateDevicesBar() {
         const devices = deviceManager.getAllDevices();
@@ -1003,6 +1006,8 @@ const UWApp = (() => {
 
     function applySettings() {
         if (typeof UISettings !== 'undefined') UISettings.applySettings();
+		
+		updateAntennaInfo();
     }
 
     function clearDevices() {
@@ -1643,6 +1648,9 @@ const UWApp = (() => {
 		exportPOI_CSV,
 		clearPOI,
 		markBeaconPoint,
+		updateAntennaInfo,
+		updateDevicesBar,
+		updateAllButtons,
         loadLog,
         saveLog,
         getState: () => ({

@@ -509,32 +509,37 @@ const UIMap = (() => {
 		if (!deviceManager) return;
 		
 		const devices = deviceManager.getAllDevices();
+		const st = typeof UWUSBLsolver !== 'undefined' ? UWUSBLsolver.getState() : null;
+		const antennaMode = st ? st.antennaMode : 'cartesian_fixed';
+		
+		// В географическом режиме нужны координаты антенны
+		const antennaLat = UWSettingsStorage.get('antenna.latDeg', NaN);
+		const antennaLon = UWSettingsStorage.get('antenna.lonDeg', NaN);
+		const hasAntenna = !isNaN(antennaLat) && !isNaN(antennaLon);
 		
 		for (const device of devices) {
 			let screenX, screenY;
 			
-			if (!isNaN(device.xM) && !isNaN(device.yM)) {
+			if (antennaMode === 'geographic') {
+				// Географический режим — только lat/lon
+				if (isNaN(device.latitudeDeg) || isNaN(device.longitudeDeg)) continue;
+				if (!hasAntenna) continue;
+				
+				const deltas = GeoUtils.deltasByDegrees(
+					antennaLat, antennaLon,
+					device.latitudeDeg, device.longitudeDeg
+				);
+				
+				const screen = worldToScreen(deltas.deltaLonM, deltas.deltaLatM);
+				screenX = screen.x;
+				screenY = screen.y;
+			} else {
+				// Декартов режим — только xM/yM
+				if (isNaN(device.xM) || isNaN(device.yM)) continue;
+				
 				const screen = worldToScreen(device.xM, device.yM);
 				screenX = screen.x;
 				screenY = screen.y;
-			} else if (!isNaN(device.latitudeDeg) && !isNaN(device.longitudeDeg)) {
-				const antennaLat = UWSettingsStorage.get('antenna.latDeg', NaN);
-				const antennaLon = UWSettingsStorage.get('antenna.lonDeg', NaN);
-				
-				if (!isNaN(antennaLat) && !isNaN(antennaLon)) {
-					const deltas = GeoUtils.deltasByDegrees(
-						antennaLat, antennaLon,
-						device.latitudeDeg, device.longitudeDeg
-					);
-					
-					const screen = worldToScreen(deltas.deltaLonM, deltas.deltaLatM);
-					screenX = screen.x;
-					screenY = screen.y;
-				} else {
-					continue;
-				}
-			} else {
-				continue;
 			}
 			
 			const rect = canvas.getBoundingClientRect();
@@ -550,7 +555,7 @@ const UIMap = (() => {
 			ctx.arc(screenX, screenY, 5, 0, Math.PI * 2);
 			ctx.fill();
 			
-			// Подпись USBL
+			// Подпись
 			if (view.showLabels) {
 				ctx.fillStyle = getComputedStyle(document.documentElement)
 					.getPropertyValue('--map-text').trim() || '#ffffff';
@@ -562,10 +567,10 @@ const UIMap = (() => {
 			if (device.vlbl && !isNaN(device.vlbl.latDeg) && !isNaN(device.vlbl.lonDeg)) {
 				let vlblScreenX, vlblScreenY;
 				
-				const antennaLat = UWSettingsStorage.get('antenna.latDeg', NaN);
-				const antennaLon = UWSettingsStorage.get('antenna.lonDeg', NaN);
-				
-				if (!isNaN(antennaLat) && !isNaN(antennaLon)) {
+				if (antennaMode === 'geographic') {
+					// В географическом режиме тоже через deltas
+					if (!hasAntenna) continue;
+					
 					const deltas = GeoUtils.deltasByDegrees(
 						antennaLat, antennaLon,
 						device.vlbl.latDeg, device.vlbl.lonDeg
@@ -574,32 +579,33 @@ const UIMap = (() => {
 					const screen = worldToScreen(deltas.deltaLonM, deltas.deltaLatM);
 					vlblScreenX = screen.x;
 					vlblScreenY = screen.y;
+				} else {
+					// В декартовом режиме координаты VLBL в lat/lon — не показываем
+					// (или считаем через антенну, если есть)
+					continue;
 				}
 				
-				if (vlblScreenX !== undefined) {
-					// Квадратик оранжевый — VLBL решение
+				// Квадратик оранжевый — VLBL решение
+				ctx.fillStyle = '#ffaa00';
+				ctx.fillRect(vlblScreenX - 4, vlblScreenY - 4, 8, 8);
+				ctx.strokeStyle = '#ffffff';
+				ctx.lineWidth = 1;
+				ctx.strokeRect(vlblScreenX - 4, vlblScreenY - 4, 8, 8);
+				
+				// Подпись
+				if (view.showLabels) {
 					ctx.fillStyle = '#ffaa00';
-					ctx.fillRect(vlblScreenX - 4, vlblScreenY - 4, 8, 8);
-					ctx.strokeStyle = '#ffffff';
+					ctx.font = '9px monospace';
+					ctx.fillText(`VLBL #${device.userAddress}`, vlblScreenX + 6, vlblScreenY + 12);
+				}
+				
+				// Радиальная ошибка
+				if (!isNaN(device.vlbl.radialError) && device.vlbl.radialError > 0) {
+					ctx.strokeStyle = 'rgba(255, 170, 0, 0.3)';
 					ctx.lineWidth = 1;
-					ctx.strokeRect(vlblScreenX - 4, vlblScreenY - 4, 8, 8);
-					
-					// Подпись
-					if (view.showLabels) {
-						ctx.fillStyle = '#ffaa00';
-						ctx.font = '9px monospace';
-						const quality = device.vlbl.quality || '';
-						ctx.fillText(`VLBL #${device.userAddress}`, vlblScreenX + 6, vlblScreenY + 12);
-					}
-					
-					// Радиальная ошибка (круг)
-					if (!isNaN(device.vlbl.radialError) && device.vlbl.radialError > 0) {
-						ctx.strokeStyle = 'rgba(255, 170, 0, 0.3)';
-						ctx.lineWidth = 1;
-						ctx.beginPath();
-						ctx.arc(vlblScreenX, vlblScreenY, device.vlbl.radialError * view.scale, 0, Math.PI * 2);
-						ctx.stroke();
-					}
+					ctx.beginPath();
+					ctx.arc(vlblScreenX, vlblScreenY, device.vlbl.radialError * view.scale, 0, Math.PI * 2);
+					ctx.stroke();
 				}
 			}
 			
@@ -615,97 +621,179 @@ const UIMap = (() => {
 		}
 	}
 
-    function drawTracks() {
-        if (typeof Tracks === 'undefined' || !Tracks.getAll) return;
-        
-        const tracks = Tracks.getAll();
-        
-        for (const address in tracks) {
-            const track = tracks[address];
-            if (track.length < 2) continue;
-            
-            ctx.strokeStyle = '#4488ff';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            
-            let started = false;
-            
-            for (const point of track) {
-                if (isNaN(point.xM) || isNaN(point.yM)) continue;
-                
-                const screen = worldToScreen(point.xM, point.yM);
-                
-                if (!started) {
-                    ctx.moveTo(screen.x, screen.y);
-                    started = true;
-                } else {
-                    ctx.lineTo(screen.x, screen.y);
-                }
-            }
-            
-            if (started) {
-                ctx.stroke();
-            }
-        }
-    }
+	function drawTracks() {
+		if (typeof Tracks === 'undefined' || !Tracks.getAll) return;
+		
+		const st = typeof UWUSBLsolver !== 'undefined' ? UWUSBLsolver.getState() : null;
+		const antennaMode = st ? st.antennaMode : 'cartesian_fixed';
+		
+		const antennaLat = UWSettingsStorage.get('antenna.latDeg', NaN);
+		const antennaLon = UWSettingsStorage.get('antenna.lonDeg', NaN);
+		const hasAntenna = !isNaN(antennaLat) && !isNaN(antennaLon);
+		
+		const tracks = Tracks.getAll();
+		
+		for (const address in tracks) {
+			const track = tracks[address];
+			if (track.length < 2) continue;
+			
+			ctx.strokeStyle = '#4488ff';
+			ctx.lineWidth = 1;
+			ctx.beginPath();
+			
+			let started = false;
+			
+			for (const point of track) {
+				let worldX, worldY;
+				
+				if (antennaMode === 'geographic') {
+					if (isNaN(point.lat) || isNaN(point.lon) || !hasAntenna) continue;
+					
+					const deltas = GeoUtils.deltasByDegrees(
+						antennaLat, antennaLon,
+						point.lat, point.lon
+					);
+					
+					worldX = deltas.deltaLonM;
+					worldY = deltas.deltaLatM;
+				} else {
+					if (isNaN(point.xM) || isNaN(point.yM)) continue;
+					worldX = point.xM;
+					worldY = point.yM;
+				}
+				
+				const screen = worldToScreen(worldX, worldY);
+				
+				if (!started) {
+					ctx.moveTo(screen.x, screen.y);
+					started = true;
+				} else {
+					ctx.lineTo(screen.x, screen.y);
+				}
+			}
+			
+			if (started) {
+				ctx.stroke();
+			}
+		}
+	}
 
-    function drawAntenna() {
-        const screen = worldToScreen(0, 0);
-        const rect = canvas.getBoundingClientRect();
-        
-        if (screen.x < -20 || screen.x > rect.width + 20 || screen.y < -20 || screen.y > rect.height + 20) {
-            return;
-        }
-        
-        // Антенна
-        ctx.fillStyle = '#ff4444';
-        ctx.beginPath();
-        ctx.arc(screen.x, screen.y, 7, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Направление
-        const heading = UWSettingsStorage.get('antenna.headingDeg', 0);
-        const rad = heading * Math.PI / 180;
-        const len = 30;
-        
-        ctx.strokeStyle = '#ff4444';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(screen.x, screen.y);
-        ctx.lineTo(
-            screen.x + len * Math.sin(rad),
-            screen.y - len * Math.cos(rad)
-        );
-        ctx.stroke();
-        
-        // Подпись
-        if (view.showLabels) {
-            ctx.fillStyle = '#ff4444';
-            ctx.font = '10px monospace';
-            ctx.fillText('ANT', screen.x + 10, screen.y - 10);
-        }
-    }
-
-    function drawPOI() {
-        if (typeof POIManager === 'undefined' || !POIManager.getAll) return;
-        
-        const pois = POIManager.getAll();
-        
-        for (const poi of pois) {
-            const screen = worldToScreen(poi.xM || 0, poi.yM || 0);
-            
-            ctx.fillStyle = '#ffcc00';
-            ctx.beginPath();
-            ctx.arc(screen.x, screen.y, 4, 0, Math.PI * 2);
-            ctx.fill();
-            
-            if (view.showLabels && poi.name) {
-                ctx.fillStyle = '#ffcc00';
-                ctx.font = '9px monospace';
-                ctx.fillText(poi.name, screen.x + 6, screen.y - 6);
-            }
-        }
-    }
+	function drawAntenna() {
+		const st = typeof UWUSBLsolver !== 'undefined' ? UWUSBLsolver.getState() : null;
+		const antennaMode = st ? st.antennaMode : 'cartesian_fixed';
+		
+		let screenX, screenY;
+		
+		if (antennaMode === 'geographic') {
+			// В географическом режиме антенна в центре вида
+			const rect = canvas.getBoundingClientRect();
+			screenX = rect.width / 2;
+			screenY = rect.height / 2;
+		} else {
+			// Декартов — антенна в (0,0)
+			const screen = worldToScreen(0, 0);
+			screenX = screen.x;
+			screenY = screen.y;
+		}
+		
+		const rect = canvas.getBoundingClientRect();
+		if (screenX < -20 || screenX > rect.width + 20 || screenY < -20 || screenY > rect.height + 20) {
+			return;
+		}
+		
+		// Антенна
+		ctx.fillStyle = '#ff4444';
+		ctx.beginPath();
+		ctx.arc(screenX, screenY, 7, 0, Math.PI * 2);
+		ctx.fill();
+		
+		// Направление
+		const heading = UWSettingsStorage.get('antenna.headingDeg', 0);
+		const rad = heading * Math.PI / 180;
+		const len = 30;
+		
+		ctx.strokeStyle = '#ff4444';
+		ctx.lineWidth = 2;
+		ctx.beginPath();
+		ctx.moveTo(screenX, screenY);
+		ctx.lineTo(
+			screenX + len * Math.sin(rad),
+			screenY - len * Math.cos(rad)
+		);
+		ctx.stroke();
+		
+		// Подпись
+		if (view.showLabels) {
+			ctx.fillStyle = '#ff4444';
+			ctx.font = '10px monospace';
+			ctx.fillText('ANT', screenX + 10, screenY - 10);
+		}
+	}
+	
+	function drawPOI() {
+		if (typeof POIManager === 'undefined' || !POIManager.getAll) return;
+		
+		const pois = POIManager.getAll();
+		if (pois.length === 0) return;
+		
+		const st = typeof UWUSBLsolver !== 'undefined' ? UWUSBLsolver.getState() : null;
+		const antennaMode = st ? st.antennaMode : 'cartesian_fixed';
+		
+		const antennaLat = UWSettingsStorage.get('antenna.latDeg', NaN);
+		const antennaLon = UWSettingsStorage.get('antenna.lonDeg', NaN);
+		const hasAntenna = !isNaN(antennaLat) && !isNaN(antennaLon);
+		
+		const rect = canvas.getBoundingClientRect();
+		
+		for (const poi of pois) {
+			let screenX, screenY;
+			
+			// POI хранятся в географических координатах (lat/lon).
+			// Для отображения нужны координаты антенны — они есть только
+			// если выполнена топопривязка (или пришли из GNSS).
+			if (isNaN(poi.lat) || isNaN(poi.lon)) continue;
+			if (!hasAntenna) continue;
+			
+			const deltas = GeoUtils.deltasByDegrees(
+				antennaLat, antennaLon,
+				poi.lat, poi.lon
+			);
+			
+			const screen = worldToScreen(deltas.deltaLonM, deltas.deltaLatM);
+			screenX = screen.x;
+			screenY = screen.y;
+			
+			if (screenX < -20 || screenX > rect.width + 20 ||
+				screenY < -20 || screenY > rect.height + 20) {
+				continue;
+			}
+			
+			// Цвет: marked — яркий, loaded — тусклый
+			const poiColor = poi.type === 'marked'
+				? (getComputedStyle(document.documentElement)
+					.getPropertyValue('--poi-marked-color').trim() || '#ffcc00')
+				: (getComputedStyle(document.documentElement)
+					.getPropertyValue('--poi-loaded-color').trim() || '#ff6600');
+			
+			// Точка
+			ctx.fillStyle = poiColor;
+			ctx.beginPath();
+			ctx.arc(screenX, screenY, 5, 0, Math.PI * 2);
+			ctx.fill();
+			
+			// Обводка
+			ctx.strokeStyle = '#ffffff';
+			ctx.lineWidth = 1;
+			ctx.stroke();
+			
+			// Подпись
+			if (view.showLabels && poi.name) {
+				ctx.fillStyle = poiColor;
+				ctx.font = '10px monospace';
+				ctx.fillText(poi.name, screenX + 8, screenY - 8);
+			}
+		}
+	}
 
 	function drawScale() {
 		const rect = canvas.getBoundingClientRect();
