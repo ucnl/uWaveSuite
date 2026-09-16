@@ -224,6 +224,43 @@ class UWPort extends EventTarget {
             case 'ptSettings':
                 this._handlePTSettings(parsed);
                 break;
+				
+			case 'H':
+			case 'ptFailed':
+				this._handlePTFailed(parsed);
+				break;
+			case 'I':
+			case 'ptDelivered':
+				this._handlePTDelivered(parsed);
+				break;
+			case 'J':
+			case 'ptReceived':
+				this._handlePTReceived(parsed);
+				break;
+
+			// === НОВЫЕ: PT ITG (короткий логический запрос) ===
+			case 'L':
+			case 'ptITGTimeout':
+				this._handlePTITGTimeout(parsed);
+				break;
+			case 'M':
+			case 'ptITGResponse':
+				this._handlePTITGResponse(parsed);
+				break;
+
+			// === НОВЫЕ: AQPNG (автономный пинг) ===
+			case 'O':
+			case 'aqpngSettings':
+				this._handleAQPNGSettings(parsed);
+				break;
+
+			// === Прочее (на всякий случай) ===
+			default:
+				// Неизвестный тип — можно залогировать в debug
+				// this._emit('log', { message: `Unhandled sentence: ${parsed.sentenceId}` });
+				break;
+				
+				
         }
     }
 

@@ -387,15 +387,18 @@ const UIChat = (() => {
         }
         
         if (msg.direction === 'incoming') {
-            return msg.type === 'packet' ? 'var(--btn-export)' : 'var(--text-info)';
+            if (msg.type === 'packet') return 'var(--btn-export)';
+            if (msg.type === 'itg-response') return 'var(--text-info)';
+            return 'var(--text-info)';
         }
         
         if (msg.direction === 'outgoing') {
-			if (msg.type === 'packet-delivered') return 'var(--border-success)';
-			if (msg.type === 'packet-failed') return 'var(--border-danger)';
-			if (msg.type === 'timeout') return 'var(--border-danger)';
-			return 'var(--btn-start)';
-		}
+            if (msg.type === 'packet-delivered') return 'var(--border-success)';
+            if (msg.type === 'packet-failed') return 'var(--border-danger)';
+            if (msg.type === 'timeout') return 'var(--border-danger)';
+            if (msg.type === 'itg-timeout') return 'var(--border-danger)';
+            return 'var(--btn-start)';
+        }
         
         return 'var(--text-primary)';
     }
@@ -405,14 +408,16 @@ const UIChat = (() => {
             if (msg.type === 'async') return '⬇';
             if (msg.type === 'packet') return '📦';
             if (msg.type === 'response') return '⬇';
+            if (msg.type === 'itg-response') return '🔍';
         }
         
         if (msg.direction === 'outgoing') {
             if (msg.type === 'packet-delivered') return '✓';
-			if (msg.type === 'packet-failed') return '✗';
-			if (msg.type === 'cdma') return '📻';
+            if (msg.type === 'packet-failed') return '✗';
+            if (msg.type === 'cdma') return '📻';
             if (msg.type === 'packet') return '📦';
             if (msg.type === 'itg') return '🔍';
+            if (msg.type === 'itg-timeout') return '⌛';
             if (msg.type === 'timeout') return '⌛';
             if (msg.type === 'response') return '✓';
         }
@@ -504,6 +509,20 @@ const UIChat = (() => {
 		if (msg.type === 'packet-failed') {
 			let text = `PKT НЕ доставлен #${d.targetPtAddress}`;
 			if (d.triesTaken !== undefined) text += ` (попыток: ${d.triesTaken})`;
+			return text;
+		}
+		
+		if (msg.type === 'itg-timeout') {
+			let text = `ITG ТАЙМАУТ #${d.targetPtAddress}`;
+			if (d.dataId !== undefined) text += ` (dataId=${d.dataId})`;
+			return text;
+		}
+
+		if (msg.type === 'itg-response') {
+			let text = `ITG ответ #${d.targetPtAddress}`;
+			if (d.dataId !== undefined) text += ` dataId=${d.dataId}`;
+			if (Number.isFinite(d.dataValue)) text += ` value=${d.dataValue.toFixed(2)}`;
+			if (Number.isFinite(d.azimuthDeg)) text += ` az=${d.azimuthDeg.toFixed(1)}°`;
 			return text;
 		}
 		
@@ -626,15 +645,6 @@ const UIChat = (() => {
         } catch (e) {
             console.warn('[UIChat] Не удалось загрузить:', e);
         }
-    }
-
-    // ========== ЗАВИСИМОСТИ ==========
-    
-    function getPort() {
-        if (window.UWApp && window.UWApp.getPort) {
-            return window.UWApp.getPort();
-        }
-        return null;
     }
 
     // ========== ПОДПИСКА ==========

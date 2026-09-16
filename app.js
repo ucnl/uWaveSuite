@@ -224,6 +224,16 @@ const UWApp = (() => {
 			UIChat.addOutgoing('packet-failed', e.detail);
 		});
 		
+		uwPort.addEventListener('packetRequestTimeout', (e) => {
+			handlePacketRequestTimeout(e.detail);
+			UIChat.addOutgoing('timeout', e.detail);   // или новый тип 'itg-timeout'
+		});
+
+		uwPort.addEventListener('packetResponse', (e) => {
+			handlePacketResponse(e.detail);
+			UIChat.addIncoming('response', e.detail);   // или 'itg-response'
+		});
+		
 		
 		
 		
@@ -490,7 +500,19 @@ const UWApp = (() => {
 		addConsoleMessage(msg, 'error', 'PT');
 	}
 
+	function handlePacketRequestTimeout(data) {
+		let msg = `ITG ТАЙМАУТ #${data.targetPtAddress}`;
+		if (data.dataId !== undefined) msg += ` (dataId=${data.dataId})`;
+		addConsoleMessage(msg, 'warning', 'PT');
+	}
 
+	function handlePacketResponse(data) {
+		let msg = `ITG ответ #${data.targetPtAddress}`;
+		if (data.dataId !== undefined) msg += ` dataId=${data.dataId}`;
+		if (Number.isFinite(data.dataValue)) msg += ` value=${data.dataValue.toFixed(2)}`;
+		if (Number.isFinite(data.azimuthDeg)) msg += ` az=${data.azimuthDeg.toFixed(1)}°`;
+		addConsoleMessage(msg, 'success', 'PT');
+	}
 
 
 	function handleTrackingResult(data) {
