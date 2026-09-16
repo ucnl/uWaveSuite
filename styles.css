@@ -431,6 +431,15 @@ body {
     z-index: 50;
 }
 
+#chat-panel {
+    display: none;
+    flex-direction: column;
+}
+
+#chat-panel.visible {
+    display: flex;
+}
+
 #connection-indicator {
     width: 14px;
     height: 14px;

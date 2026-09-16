@@ -31,7 +31,6 @@
 			<button class="top-btn btn-tools" onclick="UWApp.toggleDropdown('tools-dropdown')">🔧 Инструменты ▾</button>
 			<div id="tools-dropdown" class="dropdown-menu" style="display:none; position:absolute; top:100%; right:0; z-index:300; min-width:200px;">
 				<div class="dropdown-item" onclick="UWApp.openTrackingPanel(); UWApp.closeAllDropdowns();">🎯 Настройка трекинга</div>
-				<div class="dropdown-item" onclick="UWApp.openManualPanel(); UWApp.closeAllDropdowns();">🎮 Ручные запросы</div>
 				<div class="dropdown-item" onclick="UWApp.openDevicesPanel(); UWApp.closeAllDropdowns();">📡 Устройства</div>
 				<div class="dropdown-item" onclick="UWApp.toggleTopoPanel(); UWApp.closeAllDropdowns();">🌐 Топопривязка</div>
 				<div class="dropdown-item" onclick="UWApp.openAddressingPanel(); UWApp.closeAllDropdowns();">🔢 Адресация</div>
@@ -52,6 +51,10 @@
 				<div class="dropdown-item" onclick="UWApp.clearPOI(); UWApp.closeAllDropdowns();">🗑 Очистить все</div>
 			</div>
 		</div>
+		
+		<button id="btn-chat" class="top-btn btn-chat" onclick="UWApp.toggleChatPanel()">💬 Чат
+			<span id="chat-badge" style="display:none; background:#ff4444; color:#fff; border-radius:10px; padding:1px 6px; font-size:10px; margin-left:4px; font-weight:700;">0</span>
+		</button>
 		
 		<!-- Выпадающая кнопка Лог -->
 		<div class="dropdown" style="display:inline-block; position:relative;">
@@ -170,96 +173,100 @@
 		</div>
 	</div>
 
-	<!-- Панель ручных запросов -->
-	<div id="manual-panel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--btn-tools); border-radius:12px; padding:20px; z-index:100; min-width:350px; max-height:80vh; overflow-y:auto; backdrop-filter:blur(10px);">
-		<h3 style="color:var(--btn-tools); text-align:center; margin-bottom:16px;">🎮 Ручные запросы</h3>
+
+	<!-- Панель чата -->
+	<div id="chat-panel" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--btn-tools); border-radius:12px; padding:0; z-index:100; min-width:500px; max-width:90vw; max-height:85vh; backdrop-filter:blur(10px);">
 		
-		<!-- Статус -->
-		<div id="manual-status" style="text-align:center; font-size:12px; margin-bottom:12px; min-height:18px;"></div>
+		<!-- Заголовок -->
+		<div style="display:flex; justify-content:space-between; align-items:center; padding:12px 20px; border-bottom:1px solid var(--border-primary);">
+			<h3 style="color:var(--btn-tools); margin:0; font-size:16px;">💬 Чат</h3>
+			<div style="display:flex; gap:8px;">
+				<button onclick="UIChat.exportMessages()" title="Экспорт" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:16px;">💾</button>
+				<button onclick="UIChat.clearMessages()" title="Очистить" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:16px;">🗑</button>
+				<button onclick="UIChat.close()" title="Закрыть" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:18px;">✕</button>
+			</div>
+		</div>
 		
-		<!-- Короткие запросы -->
-		<div class="settings-section">
-			<h4>📻 Короткий запрос (CDMA)</h4>
-			<div class="settings-row">
-				<label>TX канал:</label>
-				<input type="number" id="rc-tx-ch" value="0" min="0">
-			</div>
-			<div class="settings-row">
-				<label>RX канал:</label>
-				<input type="number" id="rc-rx-ch" value="0" min="0">
-			</div>
-			<div class="settings-row">
-				<label>Команда:</label>
-				<select id="rc-cmd" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
-					<option value="0">PING</option>
-					<option value="2" selected>Глубина (DPT)</option>
-					<option value="3">Температура (TMP)</option>
-					<option value="4">Напряжение (BAT)</option>
-					<option value="7">User CMD 0</option>
-					<option value="8">User CMD 1</option>
-					<option value="9">User CMD 2</option>
-					<option value="10">User CMD 3</option>
-					<option value="11">User CMD 4</option>
-					<option value="12">User CMD 5</option>
-					<option value="13">User CMD 6</option>
-					<option value="14">User CMD 7</option>
-					<option value="15">User CMD 8</option>
+		<!-- Фильтры -->
+		<div style="display:flex; gap:6px; padding:8px 20px; border-bottom:1px solid var(--border-primary); flex-wrap:wrap;">
+			<button class="chat-filter-btn active" data-filter="all">Все</button>
+			<button class="chat-filter-btn" data-filter="incoming">⬇ Входящие</button>
+			<button class="chat-filter-btn" data-filter="outgoing">⬆ Исходящие</button>
+			<button class="chat-filter-btn" data-filter="async">ASYNC</button>
+			<button class="chat-filter-btn" data-filter="packet">Пакеты</button>
+		</div>
+		
+		<!-- Список сообщений -->
+		<div id="chat-messages" style="flex:1; overflow-y:auto; padding:12px 20px; font-family:'Consolas','Monaco',monospace; font-size:11px; line-height:1.5; min-height:250px; max-height:450px;"></div>
+		
+		<!-- Форма отправки -->
+		<div style="padding:12px 20px; border-top:1px solid var(--border-primary);">
+			<div style="display:flex; gap:8px; margin-bottom:8px;">
+				<select id="chat-send-type" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
+					<option value="cdma">📻 CDMA (короткий запрос)</option>
+					<option value="packet">📦 Передача пакета</option>
+					<option value="itg">🔍 Короткий логический (PT_ITG)</option>
 				</select>
 			</div>
-			<button id="btn-rc-send" class="btn-apply-topo" style="width:100%; margin-top:8px;">📤 Отправить</button>
 			
-			<!-- История RC -->
-			<div id="rc-history" style="margin-top:8px; padding:8px; background:var(--bg-tertiary); border-radius:4px;"></div>
-		</div>
-		
-		<!-- Пакетные запросы -->
-		<div class="settings-section" style="margin-top:16px;">
-			<h4>📦 Передача пакета</h4>
-			<div class="settings-row">
-				<label>Адрес:</label>
-				<input type="number" id="pt-addr" value="0" min="0" max="255">
+			<!-- Форма CDMA -->
+			<div id="chat-form-cdma" class="chat-form">
+				<div style="display:flex; gap:8px; margin-bottom:8px; align-items:center;">
+					<label style="font-size:11px; color:var(--text-secondary); width:60px;">TX канал:</label>
+					<input type="number" id="chat-cdma-tx" value="0" min="0" style="width:60px; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
+					<label style="font-size:11px; color:var(--text-secondary); width:60px;">RX канал:</label>
+					<input type="number" id="chat-cdma-rx" value="0" min="0" style="width:60px; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
+					<label style="font-size:11px; color:var(--text-secondary); width:60px;">Команда:</label>
+					<select id="chat-cdma-cmd" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
+						<option value="0">PING</option>
+						<option value="2" selected>Глубина (DPT)</option>
+						<option value="3">Температура (TMP)</option>
+						<option value="4">Напряжение (BAT)</option>
+						<option value="7">User CMD 0</option>
+						<option value="8">User CMD 1</option>
+						<option value="9">User CMD 2</option>
+						<option value="10">User CMD 3</option>
+						<option value="11">User CMD 4</option>
+						<option value="12">User CMD 5</option>
+						<option value="13">User CMD 6</option>
+						<option value="14">User CMD 7</option>
+						<option value="15">User CMD 8</option>
+					</select>
+				</div>
 			</div>
-			<div class="settings-row">
-				<label>Попытки:</label>
-				<input type="number" id="pt-tries" value="3" min="1" max="10">
-			</div>
-			<div class="settings-row">
-				<label>Данные:</label>
-				<input type="text" id="pt-data" placeholder="Текст (до 64 байт)" maxlength="64">
-			</div>
-			<div style="text-align:right; font-size:10px; color:var(--text-secondary); margin-top:-6px;">
-				<span id="pt-size-hint">0 / 64</span>
-			</div>
-			<button id="btn-pt-send" class="btn-apply-topo" style="width:100%; margin-top:8px;">📤 Отправить пакет</button>
 			
-			<!-- История PT -->
-			<div id="pt-history" style="margin-top:8px; padding:8px; background:var(--bg-tertiary); border-radius:4px;"></div>
-		</div>
-		
-		<!-- Запрос данных -->
-		<div class="settings-section" style="margin-top:16px;">
-			<h4>🔍 Короткий запрос (логический)</h4>
-			<div class="settings-row">
-				<label>Адрес:</label>
-				<input type="number" id="pt-itg-addr" value="0" min="0" max="255">
+			<!-- Форма пакета -->
+			<div id="chat-form-packet" class="chat-form" style="display:none;">
+				<div style="display:flex; gap:8px; margin-bottom:8px; align-items:center;">
+					<label style="font-size:11px; color:var(--text-secondary); width:60px;">Адрес:</label>
+					<input type="number" id="chat-pkt-addr" value="0" min="0" max="255" style="width:60px; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
+					<label style="font-size:11px; color:var(--text-secondary); width:60px;">Попытки:</label>
+					<input type="number" id="chat-pkt-tries" value="3" min="1" max="10" style="width:60px; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
+				</div>
+				<div style="display:flex; gap:8px; align-items:center;">
+					<label style="font-size:11px; color:var(--text-secondary); width:60px;">Данные:</label>
+					<input type="text" id="chat-pkt-data" placeholder="Текст (до 64 байт)" maxlength="64" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
+					<span id="chat-pkt-size" style="font-size:10px; color:var(--text-secondary);">0/64</span>
+				</div>
 			</div>
-			<div class="settings-row">
-				<label>Data ID:</label>
-				<select id="pt-itg-dataid" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
-					<option value="0">Глубина (DPT)</option>
-					<option value="1">Температура (TMP)</option>
-					<option value="2">Напряжение (BAT)</option>
-				</select>
+			
+			<!-- Форма ITG -->
+			<div id="chat-form-itg" class="chat-form" style="display:none;">
+				<div style="display:flex; gap:8px; align-items:center;">
+					<label style="font-size:11px; color:var(--text-secondary); width:60px;">Адрес:</label>
+					<input type="number" id="chat-itg-addr" value="0" min="0" max="254" style="width:60px; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
+					<label style="font-size:11px; color:var(--text-secondary); width:60px;">Data ID:</label>
+					<select id="chat-itg-dataid" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
+						<option value="0">Глубина (DPT)</option>
+						<option value="1">Температура (TMP)</option>
+						<option value="2">Напряжение (BAT)</option>
+					</select>
+				</div>
 			</div>
-			<button onclick="UIManual.sendPTInterrogation()" class="btn-apply-topo" style="width:100%; margin-top:8px;">🔍 Запросить</button>
+			
+			<button id="chat-send-btn" class="btn-apply-topo" style="width:100%; margin-top:8px;">📤 Отправить</button>
 		</div>
-		
-		<!-- Кнопки -->
-		<div style="display:flex; gap:8px; margin-top:16px;">
-			<button onclick="UIManual.clearHistory()" class="btn-cancel-topo" style="flex:1;">🗑 Очистить историю</button>
-			<button onclick="UIManual.close()" class="btn-cancel-topo" style="flex:1;">✕ Закрыть</button>
-		</div>
-	</div>            
+	</div>
 
 	<!-- Панель трекинга -->
 	<div id="tracking-panel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--btn-start); border-radius:12px; padding:20px; z-index:100; min-width:350px; max-height:80vh; overflow-y:auto; backdrop-filter:blur(10px);">
@@ -761,7 +768,7 @@
 	<!-- UI модули -->
 	<script src="modules/ui-themes.js"></script>
 	<script src="modules/ui-settings.js"></script>
-	<script src="modules/ui-manual.js"></script>
+	<script src="modules/ui-chat.js"></script>
 	<script src="modules/ui-tracking.js"></script>
 	<script src="modules/ui-addressing.js"></script>
 	<script src="modules/ui-vlbl.js"></script>

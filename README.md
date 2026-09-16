@@ -10,16 +10,21 @@ PWA приложение для работы с гидроакустически
 - 🎯 Трекинг устройств (CDMA каналы или логические адреса)
 - 📊 Взвешенный режим опроса (глубина чаще, температура/напряжение реже)
 - 📡 USBL — определение позиции по азимуту и дальности
-- 📍 **POI (точки интереса)** — метки на карте, загрузка/экспорт CSV
 - 📏 Линейка и графическая шкала на карте
 - 🌐 Топопривязка (ручная или через GNSS)
-- 📡 **VLBL — дальномерный режим** (определение координат маяков по дальностям с разных точек)
-- 📦 Передача пакетов (до 64 байт) и короткие запросы по логическому адресу
+- 📡 **VLBL** — дальномерный режим (определение координат маяков по дальностям с разных точек)
+- 💬 **Чат** — единая панель для отправки/приёма сообщений:
+  - Короткие запросы (CDMA и логические)
+  - Передача пакетов (до 64 байт)
+  - Приём асинхронных сообщений (ASYNC_IN, PT_RCVD)
+  - Уведомления о доставке/недоставке пакетов
+  - Счётчик непросмотренных сообщений
+- 📍 **POI (точки интереса)** — метки на карте с загрузкой/экспортом CSV
 - 💾 Логирование NMEA обмена
 - 📤 Экспорт CSV, KML, JSON, NMEA GGA, DXF
 - ▶ Воспроизведение логов с изменением скорости
 - 🎨 6 тем оформления
-- 📱 Поддержка мобильных устройств (PWA)
+- 📱 Поддержка мобильных устройств (PWA, Android через UCNLLauncher)
 
 ## Режимы работы
 
@@ -75,27 +80,70 @@ npx http-server -p 8080
 ## Структура проекта
 
 uWaveSuite/
-├── index.html              # Главная страница
-├── styles.css              # Стили
-├── app.js                  # Главный модуль
+│   app.js
+│   CHANGELOG.md
+│   dh-filter-xyz.js
+│   dh-filter.js
+│   export.js
+│   geo-utils.js
+│   gnss-parser.js
+│   haversine.js
+│   index.html
+│   LICENSE
+│   log-analyzer.js
+│   log-storage.js
+│   logger.js
+│   manifest.json
+│   median.js
+│   poi-manager.js
+│   README.md
+│   serial-manager.js
+│   settings-storage.js
+│   smoother-xyz.js
+│   smoother.js
+│   sound-speed.js
+│   styles.css
+│   sw.js
+│   tracks.js
+│   utm.js
+│   uw-device-manager.js
+│   uw-port.js
+│   uw-protocol.js
+│   uw-queue-manager.js
+│   uw-tracking-engine.js
+│   uw-usbl-solver.js
+│   uw-vlbl-measurements.js
+│   uw-vlbl-solver.js
+│   uw-vlbl-store.js
+│   uw-vlbl-worker.js
+│   vincenty.js
+│   webview-stub.js
 │
-├── uw-protocol.js          # Протокол uWave (NMEA)
-├── uw-port.js              # Драйвер порта
-├── uw-queue-manager.js     # Очередь запросов
-├── uw-device-manager.js    # Реестр устройств
-├── uw-tracking-engine.js   # Движок трекинга
-├── uw-usbl-solver.js       # USBL математика
-├── uw-vlbl-solver.js       # VLBL решатель
-├── uw-vlbl-measurements.js # Управление измерениями VLBL
-├── uw-vlbl-store.js        # Хранилище измерений и решений
-├── uw-vlbl-worker.js       # Web Worker для VLBL
+├───docs
+│       guide.md
 │
-├── serial-manager.js       # Web Serial API
-├── settings-storage.js     # Хранение настроек
+├───icons
+│       icon-192.png
+│       icon-512.png
+│       icon-maskable-512.png
 │
-├── modules/                # UI модули
-├── tools/                  # Утилиты
-└── docs/                   # Документация
+├───modules
+│       ui-addressing.js
+│       ui-cdma.js
+│       ui-chat.js
+│       ui-console.js
+│       ui-devices.js
+│       ui-export.js
+│       ui-map.js
+│       ui-ruler.js
+│       ui-settings.js
+│       ui-themes.js
+│       ui-topo.js
+│       ui-tracking.js
+│       ui-vlbl.js
+│
+└───tools
+        coord-converter.html
 
 ## Лицензия
 

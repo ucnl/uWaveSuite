@@ -3,7 +3,7 @@
 
 const UWApp = (() => {
 
-    const APP_VERSION = '0.3.0';
+    const APP_VERSION = '0.4.0';
     const APP_NAME = 'uWaveSuite';
 
     // ========== DOM ЭЛЕМЕНТЫ ==========
@@ -150,7 +150,7 @@ const UWApp = (() => {
 
     function initUIModules() {
         UISettings.init('settings-overlay');
-        UIManual.init('manual-panel');
+        UIChat.init('chat-panel'); 
         UITracking.init('tracking-panel');
         UIAddressing.init('addressing-panel');
         UIVLBL.init('vlbl-panel');
@@ -182,14 +182,21 @@ const UWApp = (() => {
         
         uwPort.addEventListener('rcResponse', (e) => {
             handleRCResponse(e.detail);
+			if (!trackingEngine || !trackingEngine.isActive) {
+				UIChat.addIncoming('response', e.detail);
+			}
         });
         
         uwPort.addEventListener('rcTimeout', (e) => {
             handleRCTimeout(e.detail);
+			if (!trackingEngine || !trackingEngine.isActive) {
+				UIChat.addOutgoing('timeout', e.detail);
+			}
         });
         
         uwPort.addEventListener('rcAsyncIn', (e) => {
             handleRCAsyncIn(e.detail);
+			UIChat.addIncoming('async', e.detail);
         });
         
         uwPort.addEventListener('ambData', (e) => {
@@ -198,7 +205,21 @@ const UWApp = (() => {
         
         uwPort.addEventListener('packetReceived', (e) => {
             handlePacketReceived(e.detail);
+			UIChat.addIncoming('packet', e.detail);
         });
+		
+		uwPort.addEventListener('packetTransferred', (e) => {
+			handlePacketTransferred(e.detail);
+			UIChat.addOutgoing('packet-delivered', e.detail);
+		});
+
+		uwPort.addEventListener('packetTransferFailed', (e) => {
+			handlePacketTransferFailed(e.detail);
+			UIChat.addOutgoing('packet-failed', e.detail);
+		});
+		
+		
+		
 		
 		uwPort.addEventListener('ackReceived', (e) => {
 			console.log('[App] ACK received:', e.detail.sentenceID, 'error:', e.detail.errorID);
@@ -438,6 +459,33 @@ const UWApp = (() => {
         }
         updateDevicesBar();
     }
+
+	function handlePacketTransferred(data) {
+		const text = data.dataPacket 
+			? new TextDecoder().decode(
+				data.dataPacket instanceof Uint8Array 
+					? data.dataPacket 
+					: new Uint8Array(data.dataPacket)
+			)
+			: '';
+		
+		let msg = `Пакет доставлен #${data.targetPtAddress}`;
+		if (data.triesTaken !== undefined) msg += ` (попыток: ${data.triesTaken})`;
+		if (!isNaN(data.azimuthDeg)) msg += `, az=${data.azimuthDeg.toFixed(1)}°`;
+		if (text) msg += ` "${text}"`;
+		
+		addConsoleMessage(msg, 'success', 'PT');
+	}
+
+	function handlePacketTransferFailed(data) {
+		let msg = `Пакет НЕ доставлен #${data.targetPtAddress}`;
+		if (data.triesTaken !== undefined) msg += ` (попыток: ${data.triesTaken})`;
+		
+		addConsoleMessage(msg, 'error', 'PT');
+	}
+
+
+
 
 	function handleTrackingResult(data) {
 		const device = data.device;
@@ -987,9 +1035,9 @@ const UWApp = (() => {
         if (typeof UITopo !== 'undefined') UITopo.getPhoneGPS();
     }
     
-    function openManualPanel() {
-        if (typeof UIManual !== 'undefined') UIManual.toggle();
-    }
+	function toggleChatPanel() {
+		if (typeof UIChat !== 'undefined') UIChat.toggle();
+	}
 
     function openAddressingPanel() {
         if (typeof UIAddressing !== 'undefined') UIAddressing.toggle();
@@ -1565,7 +1613,7 @@ const UWApp = (() => {
         applyTopoBinding,
         clearTopoBinding,
         getPhoneGPS,
-        openManualPanel,
+        toggleChatPanel,
         openAddressingPanel,
         openVLBLPanel,
         openDevicesPanel,

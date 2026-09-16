@@ -1,4 +1,4 @@
-const CACHE = 'uwave-v3';
+const CACHE = 'uwave-v4';
 
 const ASSETS = [
 	'./',
@@ -36,7 +36,7 @@ const ASSETS = [
 	'./export.js',
 	'./modules/ui-themes.js',
 	'./modules/ui-settings.js',
-	'./modules/ui-manual.js',
+	'./modules/ui-chat.js',
 	'./modules/ui-tracking.js',
 	'./modules/ui-addressing.js',
 	'./modules/ui-vlbl.js',
@@ -49,10 +49,19 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-	event.waitUntil(
-		caches.open(CACHE).then((cache) => cache.addAll(ASSETS))
-	);
-	self.skipWaiting();
+    event.waitUntil(
+        caches.open(CACHE).then((cache) => {
+            // Загружаем файлы по одному, игнорируя ошибки
+            return Promise.all(
+                ASSETS.map(url => 
+                    cache.add(url).catch(err => 
+                        console.warn('[SW] Failed to cache:', url, err)
+                    )
+                )
+            );
+        })
+    );
+    self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
