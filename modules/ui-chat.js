@@ -17,8 +17,9 @@ const UIChat = (() => {
     
     const MAX_MESSAGES = 200;
     const STORAGE_KEY = 'uwave_chat_messages';
-	
-	let uwPort = null; 
+    
+    let uwPort = null;
+    let saveTimer = null;
 
     // ========== ИНИЦИАЛИЗАЦИЯ ==========
     
@@ -90,30 +91,39 @@ const UIChat = (() => {
 
     // ========== ОТКРЫТИЕ/ЗАКРЫТИЕ ==========
     
-	function open() {
-		if (!panel) return;
-		panel.classList.add('visible');
-		isOpen = true;
-		unreadCount = 0;
-		updateBadge();
-		scrollToBottom();
-		notifyListeners('open');
-	}
+    function open() {
+        if (!panel) return;
+        panel.classList.add('visible');
+        isOpen = true;
+        unreadCount = 0;
+        updateBadge();
+        
+        // Полный рендер при открытии (чтобы увидеть накопленные сообщения)
+        renderMessages();
+        
+        // Скролл вниз после рендера
+        requestAnimationFrame(() => {
+            scrollToBottom();
+        });
+        
+        notifyListeners('open');
+    }
 
-	function close() {
-		if (!panel) return;
-		panel.classList.remove('visible');
-		isOpen = false;
-		notifyListeners('close');
-	}
+    function close() {
+        if (!panel) return;
+        panel.classList.remove('visible');
+        isOpen = false;
+        notifyListeners('close');
+    }
 
     function toggle() {
         if (isOpen) close();
         else open();
     }
 
-
-	/**
+    // ========== ПОРТ ==========
+    
+    /**
      * Установка порта (вызывается из app.js при инициализации)
      */
     function setPort(port) {
@@ -127,7 +137,6 @@ const UIChat = (() => {
     function getPort() {
         if (uwPort) return uwPort;
         
-        // Fallback (на случай, если setPort не был вызван)
         if (window.UWApp && window.UWApp.getPort) {
             return window.UWApp.getPort();
         }
@@ -170,14 +179,12 @@ const UIChat = (() => {
         const rxCh = parseInt(panel.querySelector('#chat-cdma-rx')?.value || 0);
         const cmdID = parseInt(panel.querySelector('#chat-cdma-cmd')?.value || 0);
         
-        // Добавляем сообщение в чат
         addOutgoing('cdma', {
             txChID: txCh,
             rxChID: rxCh,
             rcCmdID: cmdID
         });
         
-        // Отправляем напрямую (не через queueManager, чтобы не мешало трекингу)
         const sent = port.queryRC(txCh, rxCh, cmdID);
         
         if (!sent) {
@@ -202,7 +209,6 @@ const UIChat = (() => {
         
         const bytes = new TextEncoder().encode(dataStr);
         
-        // Добавляем сообщение
         addOutgoing('packet', {
             targetPtAddress: addr,
             dataPacket: bytes,
@@ -229,7 +235,6 @@ const UIChat = (() => {
         const addr = parseInt(panel.querySelector('#chat-itg-addr')?.value || 0);
         const dataID = parseInt(panel.querySelector('#chat-itg-dataid')?.value || 0);
         
-        // Добавляем сообщение
         addOutgoing('itg', {
             targetPtAddress: addr,
             dataId: dataID
@@ -248,7 +253,7 @@ const UIChat = (() => {
         const message = {
             id: Date.now() + Math.random(),
             direction: 'incoming',
-            type: type,                 // 'async' | 'packet' | 'response'
+            type: type,
             timestamp: Date.now(),
             data: data
         };
@@ -257,16 +262,12 @@ const UIChat = (() => {
         trimMessages();
         saveMessages();
         
-        // Бейдж если панель закрыта
         if (!isOpen) {
             unreadCount++;
             updateBadge();
             blinkButton();
-        }
-        
-        if (isOpen) {
-            renderMessages();
-            scrollToBottom();
+        } else {
+            appendMessage(message);
         }
         
         notifyListeners('message', message);
@@ -276,7 +277,7 @@ const UIChat = (() => {
         const message = {
             id: Date.now() + Math.random(),
             direction: 'outgoing',
-            type: type,                 // 'cdma' | 'packet' | 'itg' | 'response' | 'timeout'
+            type: type,
             timestamp: Date.now(),
             data: data
         };
@@ -286,8 +287,7 @@ const UIChat = (() => {
         saveMessages();
         
         if (isOpen) {
-            renderMessages();
-            scrollToBottom();
+            appendMessage(message);
         }
         
         notifyListeners('message', message);
@@ -307,19 +307,34 @@ const UIChat = (() => {
         saveMessages();
         
         if (isOpen) {
-            renderMessages();
-            scrollToBottom();
+            appendMessage(message);
         }
+        
+        notifyListeners('message', message);
     }
 
     function trimMessages() {
         if (messages.length > MAX_MESSAGES) {
+            const removed = messages.length - MAX_MESSAGES;
             messages = messages.slice(-MAX_MESSAGES);
+            
+            // Если панель открыта — убираем старые DOM-узлы
+            if (isOpen && messagesEl) {
+                for (let i = 0; i < removed; i++) {
+                    const first = messagesEl.querySelector('.chat-message');
+                    if (first) first.remove();
+                    else break;
+                }
+            }
         }
     }
 
     // ========== ОТРИСОВКА ==========
     
+    /**
+     * Полная перерисовка списка сообщений
+     * (используется при открытии, смене фильтра, очистке)
+     */
     function renderMessages() {
         if (!messagesEl) return;
         
@@ -342,6 +357,34 @@ const UIChat = (() => {
         }
         
         messagesEl.innerHTML = html;
+    }
+
+    /**
+     * Инкрементальное добавление одного сообщения в конец списка
+     * (без полной перерисовки)
+     */
+    function appendMessage(msg) {
+        if (!messagesEl || !isOpen) return;
+        
+        // Если сообщение не соответствует текущему фильтру — не добавляем
+        if (!matchesFilter(msg)) return;
+        
+        try {
+            const html = renderMessage(msg);
+            messagesEl.insertAdjacentHTML('beforeend', html);
+            scrollToBottom();
+        } catch (e) {
+            console.warn('[UIChat] appendMessage error:', e.message, msg);
+        }
+    }
+
+    function matchesFilter(msg) {
+        if (filter === 'all') return true;
+        if (filter === 'incoming') return msg.direction === 'incoming';
+        if (filter === 'outgoing') return msg.direction === 'outgoing';
+        if (filter === 'async') return msg.type === 'async';
+        if (filter === 'packet') return msg.type === 'packet' || msg.type === 'itg';
+        return true;
     }
 
     function filterMessages() {
@@ -373,7 +416,7 @@ const UIChat = (() => {
         const text = formatMessageText(msg);
         
         return `
-            <div class="chat-message ${msg.direction} ${msg.type}" style="color:${color}; margin-bottom:6px; padding:4px 0; border-bottom:1px solid rgba(128,128,128,0.1);">
+            <div class="chat-message ${msg.direction} ${msg.type}" data-id="${msg.id}" style="color:${color}; margin-bottom:6px; padding:4px 0; border-bottom:1px solid rgba(128,128,128,0.1);">
                 <div style="display:flex; justify-content:space-between; align-items:start;">
                     <span style="font-size:10px; color:var(--text-muted); min-width:60px;">[${time}]</span>
                     <span style="font-size:10px; font-weight:600; color:${color}; min-width:20px;">${icon}</span>
@@ -574,9 +617,10 @@ const UIChat = (() => {
     }
 
     function scrollToBottom() {
-        if (messagesEl) {
+        if (!messagesEl) return;
+        requestAnimationFrame(() => {
             messagesEl.scrollTop = messagesEl.scrollHeight;
-        }
+        });
     }
 
     // ========== БЕЙДЖ И МИГАНИЕ ==========
@@ -646,24 +690,29 @@ const UIChat = (() => {
 
     // ========== СОХРАНЕНИЕ/ЗАГРУЗКА ==========
     
+    /**
+     * Отложенная запись в localStorage (throttle 500 мс),
+     * чтобы не тормозить UI при частых сообщениях
+     */
     function saveMessages() {
-        try {
-            // Сохраняем только последние 100 (для скорости)
-            const toSave = messages.slice(-100).map(msg => {
-                // Uint8Array не сериализуется в JSON, конвертируем в Array
-                const copy = { ...msg };
-                if (copy.data && copy.data.dataPacket) {
-                    if (copy.data.dataPacket instanceof Uint8Array) {
-                        copy.data.dataPacket = Array.from(copy.data.dataPacket);
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+            try {
+                const toSave = messages.slice(-100).map(msg => {
+                    const copy = { ...msg };
+                    if (copy.data && copy.data.dataPacket) {
+                        if (copy.data.dataPacket instanceof Uint8Array) {
+                            copy.data.dataPacket = Array.from(copy.data.dataPacket);
+                        }
                     }
-                }
-                return copy;
-            });
-            
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
-        } catch (e) {
-            console.warn('[UIChat] Не удалось сохранить:', e);
-        }
+                    return copy;
+                });
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+            } catch (e) {
+                console.warn('[UIChat] Не удалось сохранить:', e);
+            }
+            saveTimer = null;
+        }, 500);
     }
 
     function loadMessages() {
@@ -671,7 +720,6 @@ const UIChat = (() => {
             const saved = localStorage.getItem(STORAGE_KEY);
             if (saved) {
                 const parsed = JSON.parse(saved);
-                // Фильтруем битые сообщения
                 messages = (Array.isArray(parsed) ? parsed : []).filter(
                     msg => msg && typeof msg === 'object'
                 );
@@ -679,7 +727,6 @@ const UIChat = (() => {
         } catch (e) {
             console.warn('[UIChat] Не удалось загрузить:', e);
             messages = [];
-            // Стираем битые данные, чтобы не падать каждый раз
             try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
         }
     }
@@ -709,7 +756,7 @@ const UIChat = (() => {
         init,
         open,
         close,
-		setPort,
+        setPort,
         toggle,
         isOpen: () => isOpen,
         addIncoming,
