@@ -150,7 +150,7 @@
     </div>
 	
 	<!-- Панель топопривязки -->
-	<div id="topo-panel">
+	<div id="topo-panel" class="modal-panel" style="border-color: var(--border-accent);">
 		<h3>🌐 Топопривязка</h3>
 		<div id="topo-gnss-status">Внешний GNSS не подключен</div>
 		<div class="topo-row">
@@ -173,22 +173,20 @@
 		</div>
 	</div>
 
-
 	<!-- Панель чата -->
-	<div id="chat-panel" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--btn-tools); border-radius:12px; padding:0; z-index:100; min-width:500px; max-width:90vw; max-height:85vh; backdrop-filter:blur(10px);">
-		
+	<div id="chat-panel" class="modal-panel modal-panel--chat" style="border-color: var(--btn-tools);">
 		<!-- Заголовок -->
-		<div style="display:flex; justify-content:space-between; align-items:center; padding:12px 20px; border-bottom:1px solid var(--border-primary);">
-			<h3 style="color:var(--btn-tools); margin:0; font-size:16px;">💬 Чат</h3>
-			<div style="display:flex; gap:8px;">
-				<button onclick="UIChat.exportMessages()" title="Экспорт" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:16px;">💾</button>
-				<button onclick="UIChat.clearMessages()" title="Очистить" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:16px;">🗑</button>
-				<button onclick="UIChat.close()" title="Закрыть" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:18px;">✕</button>
+		<div class="chat-header">
+			<h3>💬 Чат</h3>
+			<div class="chat-header-actions">
+				<button onclick="UIChat.exportMessages()" title="Экспорт">💾</button>
+				<button onclick="UIChat.clearMessages()" title="Очистить">🗑</button>
+				<button onclick="UIChat.close()" title="Закрыть">✕</button>
 			</div>
 		</div>
 		
 		<!-- Фильтры -->
-		<div style="display:flex; gap:6px; padding:8px 20px; border-bottom:1px solid var(--border-primary); flex-wrap:wrap;">
+		<div class="chat-filters">
 			<button class="chat-filter-btn active" data-filter="all">Все</button>
 			<button class="chat-filter-btn" data-filter="incoming">⬇ Входящие</button>
 			<button class="chat-filter-btn" data-filter="outgoing">⬆ Исходящие</button>
@@ -197,10 +195,10 @@
 		</div>
 		
 		<!-- Список сообщений -->
-		<div id="chat-messages" style="flex:1; overflow-y:auto; padding:12px 20px; font-family:'Consolas','Monaco',monospace; font-size:11px; line-height:1.5; min-height:250px; max-height:450px;"></div>
+		<div id="chat-messages"></div>
 		
 		<!-- Форма отправки -->
-		<div style="padding:12px 20px; border-top:1px solid var(--border-primary);">
+		<div class="chat-send-form">
 			<div style="display:flex; gap:8px; margin-bottom:8px;">
 				<select id="chat-send-type" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
 					<option value="cdma">📻 CDMA (короткий запрос)</option>
@@ -211,13 +209,13 @@
 			
 			<!-- Форма CDMA -->
 			<div id="chat-form-cdma" class="chat-form">
-				<div style="display:flex; gap:8px; margin-bottom:8px; align-items:center;">
-					<label style="font-size:11px; color:var(--text-secondary); width:60px;">TX канал:</label>
-					<input type="number" id="chat-cdma-tx" value="0" min="0" style="width:60px; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
-					<label style="font-size:11px; color:var(--text-secondary); width:60px;">RX канал:</label>
-					<input type="number" id="chat-cdma-rx" value="0" min="0" style="width:60px; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
-					<label style="font-size:11px; color:var(--text-secondary); width:60px;">Команда:</label>
-					<select id="chat-cdma-cmd" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
+				<div class="chat-form-row">
+					<label>TX канал:</label>
+					<input type="number" id="chat-cdma-tx" value="0" min="0">
+					<label>RX канал:</label>
+					<input type="number" id="chat-cdma-rx" value="0" min="0">
+					<label>Команда:</label>
+					<select id="chat-cdma-cmd">
 						<option value="0">PING</option>
 						<option value="2" selected>Глубина (DPT)</option>
 						<option value="3">Температура (TMP)</option>
@@ -237,26 +235,26 @@
 			
 			<!-- Форма пакета -->
 			<div id="chat-form-packet" class="chat-form" style="display:none;">
-				<div style="display:flex; gap:8px; margin-bottom:8px; align-items:center;">
-					<label style="font-size:11px; color:var(--text-secondary); width:60px;">Адрес:</label>
-					<input type="number" id="chat-pkt-addr" value="0" min="0" max="255" style="width:60px; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
-					<label style="font-size:11px; color:var(--text-secondary); width:60px;">Попытки:</label>
-					<input type="number" id="chat-pkt-tries" value="3" min="1" max="10" style="width:60px; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
+				<div class="chat-form-row">
+					<label>Адрес:</label>
+					<input type="number" id="chat-pkt-addr" value="0" min="0" max="255">
+					<label>Попытки:</label>
+					<input type="number" id="chat-pkt-tries" value="3" min="1" max="10">
 				</div>
-				<div style="display:flex; gap:8px; align-items:center;">
-					<label style="font-size:11px; color:var(--text-secondary); width:60px;">Данные:</label>
-					<input type="text" id="chat-pkt-data" placeholder="Текст (до 64 байт)" maxlength="64" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
-					<span id="chat-pkt-size" style="font-size:10px; color:var(--text-secondary);">0/64</span>
+				<div class="chat-form-row">
+					<label>Данные:</label>
+					<input type="text" id="chat-pkt-data" placeholder="Текст (до 64 байт)" maxlength="64">
+					<span id="chat-pkt-size">0/64</span>
 				</div>
 			</div>
 			
 			<!-- Форма ITG -->
 			<div id="chat-form-itg" class="chat-form" style="display:none;">
-				<div style="display:flex; gap:8px; align-items:center;">
-					<label style="font-size:11px; color:var(--text-secondary); width:60px;">Адрес:</label>
-					<input type="number" id="chat-itg-addr" value="0" min="0" max="254" style="width:60px; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
-					<label style="font-size:11px; color:var(--text-secondary); width:60px;">Data ID:</label>
-					<select id="chat-itg-dataid" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
+				<div class="chat-form-row">
+					<label>Адрес:</label>
+					<input type="number" id="chat-itg-addr" value="0" min="0" max="254">
+					<label>Data ID:</label>
+					<select id="chat-itg-dataid">
 						<option value="0">Глубина (DPT)</option>
 						<option value="1">Температура (TMP)</option>
 						<option value="2">Напряжение (BAT)</option>
@@ -269,8 +267,8 @@
 	</div>
 
 	<!-- Панель трекинга -->
-	<div id="tracking-panel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--btn-start); border-radius:12px; padding:20px; z-index:100; min-width:350px; max-height:80vh; overflow-y:auto; backdrop-filter:blur(10px);">
-		<h3 style="color:var(--btn-start); text-align:center; margin-bottom:16px;">🎯 Трекинг</h3>
+	<div id="tracking-panel" class="modal-panel" style="border-color: var(--btn-start);">
+		<h3 style="color:var(--btn-start);">🎯 Трекинг</h3>
 		
 		<!-- Статус -->
 		<div id="tracking-status" style="text-align:center; font-size:12px; margin-bottom:12px; min-height:18px;"></div>
@@ -287,7 +285,7 @@
 			<h4>⚙ Режим адресации</h4>
 			<div class="settings-row">
 				<label>Режим:</label>
-				<select id="tracking-mode" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+				<select id="tracking-mode">
 					<option value="cdma">📻 CDMA каналы</option>
 					<option value="logical">🔢 Логические адреса</option>
 				</select>
@@ -298,7 +296,6 @@
 		<div class="settings-section">
 			<h4>📡 Добавить устройство</h4>
 			
-			<!-- Для CDMA режима -->
 			<div id="tracking-add-cdma">
 				<div class="settings-row">
 					<label>TX канал:</label>
@@ -310,7 +307,6 @@
 				</div>
 			</div>
 			
-			<!-- Для Logical режима -->
 			<div id="tracking-add-logical" style="display:none;">
 				<div class="settings-row">
 					<label>Адрес:</label>
@@ -330,7 +326,7 @@
 			</div>
 			<div class="settings-row">
 				<label>Режим команд:</label>
-				<select id="tracking-command-mode" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+				<select id="tracking-command-mode">
 					<option value="weighted">Взвешенный (5:1:1)</option>
 					<option value="cycle">Циклический</option>
 					<option value="single">Одиночный</option>
@@ -341,7 +337,7 @@
 		<!-- Список устройств -->
 		<div class="settings-section">
 			<h4>📡 Устройства в трекинге</h4>
-			<div id="tracking-devices-list" style="display:flex; flex-wrap:wrap; gap:4px; padding:8px; background:var(--bg-tertiary); border-radius:4px;"></div>
+			<div id="tracking-devices-list"></div>
 			<button id="tracking-btn-clear" class="btn-cancel-topo" style="width:100%; margin-top:8px;">🗑 Очистить все</button>
 		</div>
 		
@@ -351,18 +347,15 @@
 			<div id="tracking-stats" style="font-size:11px; line-height:1.8;"></div>
 		</div>
 		
-		<!-- Закрыть -->
 		<button onclick="UITracking.close()" class="btn-cancel-topo" style="width:100%; margin-top:12px;">✕ Закрыть</button>
 	</div>
 
 	<!-- Панель адресации -->
-	<div id="addressing-panel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--btn-settings); border-radius:12px; padding:20px; z-index:100; min-width:320px; backdrop-filter:blur(10px);">
-		<h3 style="color:var(--btn-settings); text-align:center; margin-bottom:16px;">🔢 Логический адрес</h3>
+	<div id="addressing-panel" class="modal-panel" style="border-color: var(--btn-settings);">
+		<h3 style="color:var(--btn-settings);">🔢 Логический адрес</h3>
 		
-		<!-- Статус -->
 		<div id="addr-status" style="text-align:center; font-size:12px; margin-bottom:12px; min-height:18px;"></div>
 		
-		<!-- Локальный адрес -->
 		<div class="settings-section">
 			<h4>📍 Адрес локального модема</h4>
 			
@@ -383,33 +376,27 @@
 			</div>
 		</div>
 		
-		<!-- Кнопки -->
 		<div style="display:flex; gap:8px; margin-top:16px;">
 			<button id="addr-btn-apply" class="btn-apply-topo" style="flex:1;">✓ Применить</button>
 			<button id="addr-btn-read" class="btn-get-gnss" style="flex:1;">📖 Читать</button>
 		</div>
 		
-		<!-- Закрыть -->
 		<button onclick="UIAddressing.close()" class="btn-cancel-topo" style="width:100%; margin-top:12px;">✕ Закрыть</button>
 	</div>
 	
 	<!-- Панель VLBL -->
-	<div id="vlbl-panel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--btn-export); border-radius:12px; padding:20px; z-index:100; min-width:420px; max-height:80vh; overflow-y:auto; backdrop-filter:blur(10px);">
-		<h3 style="color:var(--btn-export); text-align:center; margin-bottom:16px;">📡 VLBL (дальномерный режим)</h3>
+	<div id="vlbl-panel" class="modal-panel" style="border-color: var(--btn-export);">
+		<h3 style="color:var(--btn-export);">📡 VLBL (дальномерный режим)</h3>
 		
-		<!-- Описание -->
 		<div style="font-size:11px; color:var(--text-secondary); margin-bottom:12px; line-height:1.5; padding:8px; background:var(--bg-tertiary); border-radius:4px;">
 			Определение координат маяков по дальностям с разных точек.
 			Требуется GNSS и движение вокруг маяков.
 		</div>
 		
-		<!-- Статус -->
 		<div id="vlbl-status" style="text-align:center; font-size:12px; margin-bottom:12px; min-height:18px;"></div>
 		
-		<!-- Тумблер -->
 		<button id="vlbl-btn-toggle" class="btn-get-gnss" style="width:100%; margin-bottom:16px;">▶ Включить VLBL</button>
 		
-		<!-- Настройки -->
 		<div class="settings-section">
 			<h4>⚙ Настройки</h4>
 			<div class="settings-row">
@@ -437,13 +424,11 @@
 			</div>
 		</div>
 		
-		<!-- Список устройств -->
 		<div class="settings-section">
 			<h4>📡 Устройства</h4>
-			<div id="vlbl-devices-list" style="max-height:300px; overflow-y:auto; padding:4px; background:var(--bg-tertiary); border-radius:4px; font-size:11px;"></div>
+			<div id="vlbl-devices-list"></div>
 		</div>
 		
-		<!-- Кнопки -->
 		<div style="display:flex; gap:8px; margin-top:12px;">
 			<button id="vlbl-btn-clear" class="btn-reset-topo" style="flex:1;">🗑 Очистить</button>
 			<button onclick="UIVLBL.close()" class="btn-cancel-topo" style="flex:1;">✕ Закрыть</button>
@@ -451,15 +436,13 @@
 	</div>
 
 	<!-- Панель устройств -->
-	<div id="devices-panel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--text-accent); border-radius:12px; padding:20px; z-index:100; min-width:400px; max-width:500px; max-height:80vh; overflow-y:auto; backdrop-filter:blur(10px);">
-		<h3 style="color:var(--text-accent); text-align:center; margin-bottom:16px;">📡 Устройства</h3>
+	<div id="devices-panel" class="modal-panel" style="border-color: var(--text-accent);">
+		<h3 style="color:var(--text-accent);">📡 Устройства</h3>
 		
-		<!-- Поиск -->
 		<div style="margin-bottom:12px;">
 			<input type="text" id="devices-search" placeholder="🔍 Поиск..." style="width:100%; padding:8px 12px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:12px;">
 		</div>
 		
-		<!-- Фильтры -->
 		<div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
 			<label style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
 				<input type="checkbox" id="devices-filter-usbl" class="devices-filter-checkbox" checked> USBL
@@ -475,7 +458,6 @@
 			</label>
 		</div>
 		
-		<!-- Сортировка -->
 		<div style="display:flex; gap:8px; margin-bottom:12px; align-items:center;">
 			<select id="devices-sort" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); font-size:11px;">
 				<option value="address">По адресу</option>
@@ -486,39 +468,32 @@
 			<button id="devices-sort-order" style="padding:6px 10px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary); cursor:pointer;">↑</button>
 		</div>
 		
-		<!-- Статистика -->
 		<div id="devices-stats" style="display:flex; gap:8px; margin-bottom:12px; font-size:11px; color:var(--text-secondary); flex-wrap:wrap;"></div>
 		
-		<!-- Список устройств -->
 		<div id="devices-list" style="max-height:50vh; overflow-y:auto;"></div>
 		
-		<!-- Кнопки -->
 		<div style="display:flex; gap:8px; margin-top:12px;">
 			<button id="devices-btn-refresh" class="btn-get-gnss" style="flex:1;">🔄 Обновить</button>
 			<button id="devices-btn-export" class="btn-get-gnss" style="flex:1;">💾 Экспорт</button>
 			<button id="devices-btn-clear" class="btn-reset-topo" style="flex:1;">🗑 Очистить</button>
 		</div>
 		
-		<!-- Закрыть -->
 		<button onclick="UIDevices.close()" class="btn-cancel-topo" style="width:100%; margin-top:8px;">✕ Закрыть</button>
 	</div>
 
 	<!-- Панель экспорта -->
-	<div id="export-panel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-overlay); border:2px solid var(--btn-export); border-radius:12px; padding:20px; z-index:100; min-width:400px; max-height:80vh; overflow-y:auto; backdrop-filter:blur(10px);">
-		<h3 style="color:var(--btn-export); text-align:center; margin-bottom:16px;">📤 Экспорт данных</h3>
+	<div id="export-panel" class="modal-panel" style="border-color: var(--btn-export);">
+		<h3 style="color:var(--btn-export);">📤 Экспорт данных</h3>
 		
-		<!-- Статус -->
 		<div id="export-status" style="text-align:center; font-size:12px; margin-bottom:12px; min-height:18px;"></div>
 		
-		<!-- Статистика -->
 		<div id="export-stats" style="font-size:12px; margin-bottom:12px;"></div>
 		
-		<!-- Формат -->
 		<div class="settings-section">
 			<h4>⚙ Формат</h4>
 			<div class="settings-row">
 				<label>Формат:</label>
-				<select id="export-format" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+				<select id="export-format">
 					<option value="csv">📊 CSV</option>
 					<option value="kml">🗺 KML</option>
 					<option value="json">💾 JSON</option>
@@ -527,11 +502,10 @@
 				</select>
 			</div>
 			
-			<!-- Опции CSV -->
 			<div id="export-csv-options">
 				<div class="settings-row">
 					<label>Разделитель:</label>
-					<select id="export-delimiter" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+					<select id="export-delimiter">
 						<option value="semicolon">; (точка с запятой)</option>
 						<option value="comma">, (запятая)</option>
 						<option value="tab">Tab</option>
@@ -539,14 +513,13 @@
 				</div>
 				<div class="settings-row">
 					<label>Десятичный:</label>
-					<select id="export-decimal" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+					<select id="export-decimal">
 						<option value=".">. (точка)</option>
 						<option value=",">, (запятая)</option>
 					</select>
 				</div>
 			</div>
 			
-			<!-- Опции KML -->
 			<div id="export-kml-options" style="display:none;">
 				<div class="settings-row">
 					<small style="color:var(--text-secondary);">KML включает точки устройств и треки</small>
@@ -554,7 +527,6 @@
 			</div>
 		</div>
 		
-		<!-- Опции данных -->
 		<div class="settings-section">
 			<h4>📊 Данные</h4>
 			<div style="display:flex; flex-wrap:wrap; gap:8px;">
@@ -582,20 +554,17 @@
 			</div>
 		</div>
 		
-		<!-- Превью -->
 		<div class="settings-section">
 			<h4>👁 Превью</h4>
 			<pre id="export-preview" style="display:none; padding:8px; background:var(--bg-tertiary); border-radius:4px; font-size:10px; font-family:'Consolas','Monaco',monospace; max-height:200px; overflow-y:auto; white-space:pre-wrap;"></pre>
 		</div>
 		
-		<!-- Кнопки -->
 		<div style="display:flex; gap:8px; margin-top:12px;">
 			<button id="export-btn-preview" class="btn-get-gnss" style="flex:1;">👁 Превью</button>
 			<button id="export-btn-copy" class="btn-get-gnss" style="flex:1;">📋 Копировать</button>
 			<button id="export-btn-export" class="btn-apply-topo" style="flex:1;">💾 Экспорт</button>
 		</div>
 		
-		<!-- Закрыть -->
 		<button onclick="UIExport.close()" class="btn-cancel-topo" style="width:100%; margin-top:8px;">✕ Закрыть</button>
 	</div>
 
@@ -626,7 +595,6 @@
                 <button onclick="UWApp.closeSettings()" title="Закрыть">✕</button>
             </div>
             <div id="settings-body">
-                <!-- Секция: Устройство -->
                 <div class="settings-section">
                     <h4>📡 Устройство</h4>
                     <div class="settings-row">
@@ -656,12 +624,11 @@
 					</div>
                 </div>
                 
-                <!-- Секция: GNSS -->
                 <div class="settings-section">
                     <h4>📡 GNSS-компас</h4>
                     <div class="settings-row">
                         <label>Режим компаса:</label>
-                        <select id="cfg-compass-mode" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+                        <select id="cfg-compass-mode">
                             <option value="auto">Авто</option>
                             <option value="hdt">Только HDT</option>
                             <option value="magnetic">Только магнитный</option>
@@ -669,7 +636,7 @@
                     </div>
                     <div class="settings-row">
                         <label>Скорость:</label>
-                        <select id="cfg-gnss-baud" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+                        <select id="cfg-gnss-baud">
                             <option value="4800">4800</option>
                             <option value="9600">9600</option>
                             <option value="19200">19200</option>
@@ -680,12 +647,11 @@
                     </div>
                 </div>
                 
-                <!-- Секция: Антенна -->
                 <div class="settings-section">
                     <h4>📍 Антенна</h4>
                     <div class="settings-row">
                         <label>Режим:</label>
-                        <select id="cfg-antenna-mode" style="flex:1; padding:6px; border:1px solid var(--border-primary); border-radius:4px; background:var(--bg-input); color:var(--text-primary);">
+                        <select id="cfg-antenna-mode">
                             <option value="cartesian_fixed">📐 Декартов</option>
                             <option value="geographic">🌍 Географический</option>
                         </select>
@@ -708,7 +674,6 @@
                     </div>
                 </div>
                 
-                <!-- Секция: Треки -->
                 <div class="settings-section">
                     <h4>📐 Треки</h4>
                     <div class="settings-row">

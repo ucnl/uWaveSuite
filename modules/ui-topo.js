@@ -44,7 +44,6 @@ const UITopo = (() => {
         if (!panel) return;
         
         panel.classList.add('visible');
-        panel.style.display = 'block';
         isOpen = true;
         
         updateGNSSStatus();
@@ -57,7 +56,6 @@ const UITopo = (() => {
         if (!panel) return;
         
         panel.classList.remove('visible');
-        panel.style.display = 'none';
         isOpen = false;
         
         stopCompassUpdates();
@@ -115,7 +113,7 @@ const UITopo = (() => {
         if (!compassActive) return;
         
         const heading = window._nativeCompass?.heading;
-        if (heading !== undefined && !isNaN(heading)) {
+        if (Number.isFinite(heading)) {
             compassValues.push({
                 heading: heading,
                 timestamp: Date.now()
@@ -132,7 +130,7 @@ const UITopo = (() => {
         const hdgEl = document.getElementById('topo-hdg');
         const statusEl = document.getElementById('topo-gnss-status');
         
-        if (heading !== undefined && !isNaN(heading) && hdgEl) {
+        if (Number.isFinite(heading) && hdgEl) {
             hdgEl.value = heading.toFixed(1);
             
             if (statusEl) {
@@ -179,16 +177,14 @@ const UITopo = (() => {
         
         const stability = getCompassStability();
         const statusEl = document.getElementById('topo-gnss-status');
+        const heading = window._nativeCompass?.heading;
         
-        if (statusEl && stability === 'stable') {
-            const heading = window._nativeCompass?.heading;
-            if (heading !== undefined && !isNaN(heading)) {
-                statusEl.innerHTML = `
-                    ✅ Азимут стабилен: ${heading.toFixed(1)}°<br>
-                    <small style="font-size:10px;">Можно применять топопривязку</small>
-                `;
-                statusEl.className = 'locked';
-            }
+        if (statusEl && stability === 'stable' && Number.isFinite(heading)) {
+            statusEl.innerHTML = `
+                ✅ Азимут стабилен: ${heading.toFixed(1)}°<br>
+                <small style="font-size:10px;">Можно применять топопривязку</small>
+            `;
+            statusEl.className = 'locked';
         }
     }
     
@@ -228,9 +224,9 @@ const UITopo = (() => {
         const lonEl = document.getElementById('topo-lon');
         const hdgEl = document.getElementById('topo-hdg');
         
-        if (latEl && !isNaN(lat)) latEl.value = lat.toFixed(8);
-        if (lonEl && !isNaN(lon)) lonEl.value = lon.toFixed(8);
-        if (hdgEl && !isNaN(heading)) hdgEl.value = heading.toFixed(1);
+        if (latEl && Number.isFinite(lat)) latEl.value = lat.toFixed(8);
+        if (lonEl && Number.isFinite(lon)) lonEl.value = lon.toFixed(8);
+        if (hdgEl && Number.isFinite(heading)) hdgEl.value = heading.toFixed(1);
     }
     
     /**
@@ -240,14 +236,15 @@ const UITopo = (() => {
         if (typeof UWUSBLsolver === 'undefined') return;
         
         const st = UWUSBLsolver.getState();
+        if (!st) return;
         
         const latEl = document.getElementById('topo-lat');
         const lonEl = document.getElementById('topo-lon');
         const hdgEl = document.getElementById('topo-hdg');
         
-        if (latEl && !isNaN(st.antennaLatDeg)) latEl.value = st.antennaLatDeg.toFixed(8);
-        if (lonEl && !isNaN(st.antennaLonDeg)) lonEl.value = st.antennaLonDeg.toFixed(8);
-        if (hdgEl && !isNaN(st.antennaHeadingDeg)) hdgEl.value = st.antennaHeadingDeg.toFixed(1);
+        if (latEl) latEl.value = Number.isFinite(st.antennaLatDeg) ? st.antennaLatDeg.toFixed(8) : '';
+        if (lonEl) lonEl.value = Number.isFinite(st.antennaLonDeg) ? st.antennaLonDeg.toFixed(8) : '';
+        if (hdgEl) hdgEl.value = Number.isFinite(st.antennaHeadingDeg) ? st.antennaHeadingDeg.toFixed(1) : '0';
     }
 
     // ========== ПРИМЕНЕНИЕ ==========
@@ -255,11 +252,15 @@ const UITopo = (() => {
     function applyBinding() {
         if (!panel) return;
         
-        const lat = parseFloat(document.getElementById('topo-lat')?.value);
-        const lon = parseFloat(document.getElementById('topo-lon')?.value);
-        const heading = parseFloat(document.getElementById('topo-hdg')?.value || 0);
+        const latRaw = document.getElementById('topo-lat')?.value.trim() ?? '';
+        const lonRaw = document.getElementById('topo-lon')?.value.trim() ?? '';
+        const hdgRaw = document.getElementById('topo-hdg')?.value.trim() ?? '';
         
-        if (isNaN(lat) || isNaN(lon)) {
+        const lat = Number(latRaw);
+        const lon = Number(lonRaw);
+        const heading = hdgRaw === '' ? 0 : Number(hdgRaw);
+        
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
             alert('Введите корректные координаты');
             return;
         }
@@ -269,7 +270,7 @@ const UITopo = (() => {
             return;
         }
         
-        if (heading < 0 || heading > 360) {
+        if (!Number.isFinite(heading) || heading < 0 || heading > 360) {
             alert('Курс должен быть 0-360°');
             return;
         }
@@ -291,36 +292,36 @@ const UITopo = (() => {
         }
         
         // Обновляем UI антенны
-		if (window.UWApp && UWApp.updateAntennaInfo) {
-			UWApp.updateAntennaInfo();
-		}
+        if (window.UWApp && UWApp.updateAntennaInfo) {
+            UWApp.updateAntennaInfo();
+        }
 
-		// Обновляем настройки (галочка выбора режима)
-		if (typeof UISettings !== 'undefined' && UISettings.updateFieldsFromSettings) {
-			UISettings.updateFieldsFromSettings();
-		}
+        // Обновляем настройки (галочка выбора режима)
+        if (typeof UISettings !== 'undefined' && UISettings.updateFieldsFromSettings) {
+            UISettings.updateFieldsFromSettings();
+        }
 
-		// Обновляем устройства (карточки)
-		if (window.UWApp && UWApp.updateDevicesBar) {
-			UWApp.updateDevicesBar();
-		}
+        // Обновляем устройства (карточки)
+        if (window.UWApp && UWApp.updateDevicesBar) {
+            UWApp.updateDevicesBar();
+        }
 
-		// Перерисовываем карту
-		if (typeof UIMap !== 'undefined' && UIMap.draw) {
-			UIMap.draw();
-		}
-        
-        notifyListeners('applied', binding);
+        // Перерисовываем карту
+        if (typeof UIMap !== 'undefined' && UIMap.draw) {
+            UIMap.draw();
+        }
         
         stopCompassUpdates();
         close();
+        
+        notifyListeners('applied', binding);
     }
     
     function clearBinding() {
         localStorage.removeItem('uwave_topo_binding');
         
-        UWSettingsStorage.set('antenna.latDeg', NaN);
-        UWSettingsStorage.set('antenna.lonDeg', NaN);
+        UWSettingsStorage.set('antenna.latDeg', null);
+        UWSettingsStorage.set('antenna.lonDeg', null);
         UWSettingsStorage.set('antenna.headingDeg', 0);
         UWSettingsStorage.set('antenna.mode', 'cartesian_fixed');
         UWSettingsStorage.save();
@@ -340,28 +341,29 @@ const UITopo = (() => {
         if (hdgEl) hdgEl.value = '0';
         
         // Обновляем UI
-		if (window.UWApp && UWApp.updateAntennaInfo) {
-			UWApp.updateAntennaInfo();
-		}
+        if (window.UWApp && UWApp.updateAntennaInfo) {
+            UWApp.updateAntennaInfo();
+        }
 
-		// Обновляем настройки (галочка выбора режима)
-		if (typeof UISettings !== 'undefined' && UISettings.updateFieldsFromSettings) {
-			UISettings.updateFieldsFromSettings();
-		}
+        // Обновляем настройки (галочка выбора режима)
+        if (typeof UISettings !== 'undefined' && UISettings.updateFieldsFromSettings) {
+            UISettings.updateFieldsFromSettings();
+        }
 
-		// Обновляем устройства (карточки)
-		if (window.UWApp && UWApp.updateDevicesBar) {
-			UWApp.updateDevicesBar();
-		}
+        // Обновляем устройства (карточки)
+        if (window.UWApp && UWApp.updateDevicesBar) {
+            UWApp.updateDevicesBar();
+        }
 
-		// Перерисовываем карту
-		if (typeof UIMap !== 'undefined' && UIMap.draw) {
-			UIMap.draw();
-		}
+        // Перерисовываем карту
+        if (typeof UIMap !== 'undefined' && UIMap.draw) {
+            UIMap.draw();
+        }
         
-        notifyListeners('cleared');
         stopCompassUpdates();
         close();
+        
+        notifyListeners('cleared');
     }
 
     // ========== ЗАГРУЗКА ==========
@@ -372,14 +374,14 @@ const UITopo = (() => {
             if (saved) {
                 const data = JSON.parse(saved);
                 
-                if (!isNaN(data.lat) && !isNaN(data.lon)) {
+                if (Number.isFinite(data?.lat) && Number.isFinite(data?.lon)) {
                     UWSettingsStorage.set('antenna.latDeg', data.lat);
                     UWSettingsStorage.set('antenna.lonDeg', data.lon);
-                    UWSettingsStorage.set('antenna.headingDeg', data.hdg || 0);
+                    UWSettingsStorage.set('antenna.headingDeg', Number.isFinite(data.hdg) ? data.hdg : 0);
                     UWSettingsStorage.set('antenna.mode', 'geographic');
                     
                     if (typeof UWUSBLsolver !== 'undefined') {
-                        UWUSBLsolver.setAntennaPosition(data.lat, data.lon, data.hdg || 0);
+                        UWUSBLsolver.setAntennaPosition(data.lat, data.lon, Number.isFinite(data.hdg) ? data.hdg : 0);
                         UWUSBLsolver.setAntennaMode('geographic');
                     }
                 }
@@ -411,8 +413,8 @@ const UITopo = (() => {
                 const latEl = document.getElementById('topo-lat');
                 const lonEl = document.getElementById('topo-lon');
                 
-                if (latEl) latEl.value = lat.toFixed(8);
-                if (lonEl) lonEl.value = lon.toFixed(8);
+                if (latEl && Number.isFinite(lat)) latEl.value = lat.toFixed(8);
+                if (lonEl && Number.isFinite(lon)) lonEl.value = lon.toFixed(8);
                 
                 if (statusEl) {
                     statusEl.innerHTML = `✓ Координаты получены<br><small>Запуск компаса...</small>`;
