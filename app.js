@@ -40,6 +40,8 @@ const UWApp = (() => {
     // ========== ИНИЦИАЛИЗАЦИЯ ==========
     
     function init() {
+		window.UWApp = UWApp;
+		
         // DOM элементы
         connectionIndicator = document.getElementById('connection-indicator');
         statusText = document.getElementById('status-text');
@@ -1674,8 +1676,7 @@ const UWApp = (() => {
 // Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', () => {
     try {
-        UWApp.init();
-        window.UWApp = UWApp;
+        UWApp.init();        
     } catch (err) {
         console.error('[uWaveSuite] Ошибка инициализации:', err);
         console.error(err.stack);
