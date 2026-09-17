@@ -328,10 +328,13 @@ class UWTrackingEngine extends EventTarget {
 	_handleTrackingResult(result) {
 		this.stats.successful++;
 		
+		// Определяем тип адресации из result
+		const type = result.type || 'cdma';
+		
 		const device = this.deviceManager.processResponse({
 			...result,
 			address: result.address,
-			type: 'cdma'
+			type: type
 		});
 		
 		this._emit('result', {
@@ -344,9 +347,6 @@ class UWTrackingEngine extends EventTarget {
 		this._advanceToNextDevice();
 	}
 
-    /**
-     * Обработать ошибку трекинга
-     */
 	_handleTrackingError(data) {
 		this.stats.failed++;
 		
@@ -354,8 +354,10 @@ class UWTrackingEngine extends EventTarget {
 			this.stats.timeouts++;
 		}
 		
+		const type = data.type || 'cdma';
+		
 		if (data.address !== undefined) {
-			this.deviceManager.processTimeout(data.address, 'cdma');
+			this.deviceManager.processTimeout(data.address, type);
 		}
 		
 		this._emit('error', {

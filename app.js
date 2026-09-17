@@ -501,17 +501,55 @@ const UWApp = (() => {
 	}
 
 	function handlePacketRequestTimeout(data) {
-		let msg = `ITG ТАЙМАУТ #${data.targetPtAddress}`;
-		if (data.dataId !== undefined) msg += ` (dataId=${data.dataId})`;
-		addConsoleMessage(msg, 'warning', 'PT');
+		const device = deviceManager.processTimeout(data.targetPtAddress, 'logical');
+		
+		if (device) {
+			let msg = `ITG ТАЙМАУТ #${device.userAddress}`;
+			if (data.dataId !== undefined) msg += ` (dataId=${data.dataId})`;
+			addConsoleMessage(msg, 'warning', 'PT');
+			updateDevicesBar();
+		}
+		
+		// Уведомляем trackingEngine
+		if (trackingEngine && trackingEngine.isActive) {
+			trackingEngine._handleTrackingError({
+				address: data.targetPtAddress,
+				type: 'logical',
+				error: new Error('ITG timeout')
+			});
+		}
 	}
 
 	function handlePacketResponse(data) {
-		let msg = `ITG ответ #${data.targetPtAddress}`;
-		if (data.dataId !== undefined) msg += ` dataId=${data.dataId}`;
-		if (Number.isFinite(data.dataValue)) msg += ` value=${data.dataValue.toFixed(2)}`;
-		if (Number.isFinite(data.azimuthDeg)) msg += ` az=${data.azimuthDeg.toFixed(1)}°`;
-		addConsoleMessage(msg, 'success', 'PT');
+		// Обновляем устройство
+		const device = deviceManager.processResponse({
+			...data,
+			address: data.targetPtAddress,
+			type: 'logical'
+		});
+		
+		if (device) {
+			const solved = UWUSBLsolver.solveUSBL(device);
+			if (solved) {
+				addTrackPoint(solved);
+				updateDevicesBar();
+			}
+			
+			let msg = `ITG #${device.userAddress}`;
+			if (data.dataId !== undefined) msg += ` dataId=${data.dataId}`;
+			if (Number.isFinite(data.dataValue)) msg += ` value=${data.dataValue.toFixed(2)}`;
+			if (Number.isFinite(data.azimuthDeg)) msg += ` az=${data.azimuthDeg.toFixed(1)}°`;
+			addConsoleMessage(msg, 'success', 'PT');
+		}
+		
+		// Уведомляем trackingEngine
+		if (trackingEngine && trackingEngine.isActive) {
+			trackingEngine._handleTrackingResult({
+				address: data.targetPtAddress,
+				result: data,
+				type: 'logical'
+			});
+		}
 	}
 
 
