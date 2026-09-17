@@ -331,9 +331,15 @@ class UWTrackingEngine extends EventTarget {
 		// Определяем тип адресации из result
 		const type = result.type || 'cdma';
 		
+		// Нормализуем имя propagation time
+		const propTime = result.propTimeS 
+					  ?? result.propTimeSec 
+					  ?? result.propagationTimeS;
+		
 		const device = this.deviceManager.processResponse({
 			...result,
 			address: result.address,
+			propTimeS: propTime,        
 			type: type
 		});
 		

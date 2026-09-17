@@ -1,4 +1,4 @@
-const CACHE = 'uwave-v13';
+const CACHE = 'uwave-v15';   // ← сменил версию, чтобы SW переустановился
 
 const ASSETS = [
 	'./',
@@ -80,9 +80,29 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-		
+	// Не трогаем запросы на другие origin'ы (например, GitHub, docs.unavlab.com
+	// вне /uWaveSuite/, CDN и т.д.) — пусть идут в сеть как обычно.
+	const url = new URL(event.request.url);
+	if (url.origin !== location.origin) {
+		return;
+	}
+	
+	// Навигационные запросы (открытие страницы) — отдаём index.html из кэша.
+	// Это покрывает случай, когда лаунчер добавляет ?native=1 к URL.
+	if (event.request.mode === 'navigate') {
+		event.respondWith(
+			caches.match('./index.html', { ignoreSearch: true }).then((cached) => {
+				return cached || fetch(event.request);
+			})
+		);
+		return;
+	}
+	
+	// Остальные запросы — cache-first с игнором query string.
+	// ignoreSearch: true позволяет найти в кэше ./app.js,
+	// даже если запрос идёт как ./app.js?v=15 или ./app.js?native=1.
 	event.respondWith(
-		caches.match(event.request).then((cached) => {
+		caches.match(event.request, { ignoreSearch: true }).then((cached) => {
 			return cached || fetch(event.request);
 		})
 	);

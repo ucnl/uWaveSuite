@@ -96,16 +96,24 @@ class UWPort extends EventTarget {
         }
     }
 
-    async close() {
-        this._stopTimer();
-        await this.serial.close();
-        this.detected = false;
-        this.deviceInfo.isValid = false;
-        this.connecting = false;
-        this.isWaitingLocal = false;
-        this.isWaitingRemote = false;
-        this._emit('stateChanged');
-    }
+	async close() {
+		this._stopTimer();
+		
+		// Сначала сбрасываем всё состояние
+		this.detected = false;
+		this.deviceInfo.isValid = false;
+		this.connecting = false;
+		this.isWaitingLocal = false;
+		this.isWaitingRemote = false;
+		this._emit('stateChanged');
+		
+		// Потом пытаемся закрыть физический порт
+		try {
+			await this.serial.close();
+		} catch (e) {
+			console.warn('[UWPort] close error:', e.message);
+		}
+	}
 
     _onClose() {
         this._stopTimer();
@@ -148,7 +156,6 @@ class UWPort extends EventTarget {
             
             if (this.detected) {
                 this._emit('timeout', { queryID: this.lastQueryID });
-                this.detected = false;
                 this.isWaitingLocal = false;
                 this.isWaitingRemote = false;
                 this._emit('stateChanged');
@@ -162,7 +169,7 @@ class UWPort extends EventTarget {
     // ======================== ОБРАБОТКА ВХОДЯЩИХ ========================
     
 	_onNMEAMessage(rawLine) {
-		this._resetTimer();
+		//this._resetTimer();
 		this._emit('log', { message: `RCV >> ${rawLine.trim()}` });
 		
 		// Логируем в Logger если доступен
@@ -392,12 +399,26 @@ class UWPort extends EventTarget {
 		}
 		
 		try {
-			this.serial.send(message);
+			const sendResult = this.serial.send(message);
+			
+			// Если send вернул промис — обработать его ошибку
+			if (sendResult && typeof sendResult.then === 'function') {
+				sendResult.catch(err => {
+					console.warn('[UWPort] send failed (async):', err.message);
+					this.isWaitingLocal = false;
+					this._emit('error', { message: `Send error (async): ${err.message}` });
+					this._emit('stateChanged');
+				});
+			}
+			
 			this._emit('log', { message: `SND << ${message.trim()}` });
 			
-			// Логируем в Logger если доступен
 			if (typeof Logger !== 'undefined' && Logger.logOutgoing) {
-				Logger.logOutgoing('UWV', message.trim());
+				try {
+					Logger.logOutgoing('UWV', message.trim());
+				} catch (e) {
+					console.warn('[UWPort] Logger.logOutgoing failed:', e.message);
+				}
 			}
 			
 			const timeout = timeoutMs || (
@@ -416,6 +437,8 @@ class UWPort extends EventTarget {
 			return true;
 			
 		} catch (err) {
+			// Синхронная ошибка — сбрасываем флаг
+			this.isWaitingLocal = false;
 			this._emit('error', { message: `Send error: ${err.message}` });
 			return false;
 		}

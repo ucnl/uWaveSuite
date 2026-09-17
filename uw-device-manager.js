@@ -124,6 +124,7 @@ class UWDeviceManager extends EventTarget {
 				elevationDeg: NaN,
 				depthM: NaN,
 				propTimeS: NaN,
+				propTimeSec: NaN,
 				msrDB: NaN,
 				
 				temperatureC: NaN,
@@ -223,26 +224,32 @@ class UWDeviceManager extends EventTarget {
     /**
      * Обработать ответ от удаленного устройства
      */
-    processResponse(response) {
+	processResponse(response) {
 		const address = response.address || response.targetPtAddress || 0;
 		const type = response.type || 'cdma';
 		const rx = response.rxChID !== undefined ? response.rxChID : address;
 		
 		const device = this.getOrCreateDevice(address, type, rx);
-        
-        // Обновляем данные
-        if (!isNaN(response.azimuthDeg)) {
-            device.azimuthDeg = response.azimuthDeg;
-            device.isUSBL = true;           // Есть azimuth — это USBL
-        }
-        
-        if (!isNaN(response.propTimeSec)) {
-            device.propTimeSec = response.propTimeSec;
-        }
-        
-        if (!isNaN(response.msrDb)) {
-            device.msrDB = response.msrDb;
-        }
+		
+		// Нормализуем propagation time из любого источника
+		const propTime = response.propTimeS 
+					  ?? response.propTimeSec 
+					  ?? response.propagationTimeS;
+		
+		if (Number.isFinite(propTime) && propTime > 0) {
+			device.propTimeS = propTime;             // ← единое имя
+			device.propTimeSec = propTime;           // ← для совместимости
+		}
+		
+		// Обновляем данные
+		if (!isNaN(response.azimuthDeg)) {
+			device.azimuthDeg = response.azimuthDeg;
+			device.isUSBL = true;
+		}
+		
+		if (!isNaN(response.msrDb)) {
+			device.msrDB = response.msrDb;
+		}
         
         if (!isNaN(response.value)) {
             // Определяем тип значения по команде

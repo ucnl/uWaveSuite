@@ -211,7 +211,7 @@ const UWProtocol = (() => {
     function parseNMEA(rawLine) {
         if (!rawLine || rawLine.length === 0) return null;
 
-        const line = rawLine.replace(/[\r\n]+$/, '');
+        const line = rawLine.trim();
         if (!line.startsWith('$')) return null;
 
         const chkIdx = line.indexOf('*');
@@ -270,20 +270,22 @@ const UWProtocol = (() => {
         };
     }
 
-    function parseRCResponse(params) {
-        const azimuth = o2d(params[5]);
-        return {
-            type: 'rcResponse',
-            txChID: o2i(params[0]),
-            rcCmdID: o2rc(params[1]),
-            propTimeSec: o2d(params[2]),
-            msrDb: o2d(params[3]),
-            value: o2d(params[4]),
-            azimuthDeg: azimuth,
-            isValuePresent: !isNaN(o2d(params[4])),
-            isAzimuthPresent: !isNaN(azimuth)
-        };
-    }
+	function parseRCResponse(params) {
+		const azimuth = o2d(params[5]);
+		const propTime = o2d(params[2]);
+		return {
+			type: 'rcResponse',
+			txChID: o2i(params[0]),
+			rcCmdID: o2rc(params[1]),
+			propTimeS: propTime,     
+			propTimeSec: propTime,   
+			msrDb: o2d(params[3]),
+			value: o2d(params[4]),
+			azimuthDeg: azimuth,
+			isValuePresent: !isNaN(o2d(params[4])),
+			isAzimuthPresent: !isNaN(azimuth)
+		};
+	}
 
     function parseRCTimeout(params) {
         return {
@@ -385,16 +387,18 @@ const UWProtocol = (() => {
         };
     }
 
-    function parsePTITGResponse(params) {
-        return {
-            type: 'ptITGResponse',
-            targetPtAddress: o2i(params[0]),
-            dataId: o2did(params[1]),
-            dataValue: o2d(params[2]),
-            propagationTimeS: o2d(params[3]),
-            azimuthDeg: o2d(params[4])
-        };
-    }
+	function parsePTITGResponse(params) {
+		const propTime = o2d(params[3]);
+		return {
+			type: 'ptITGResponse',
+			targetPtAddress: o2i(params[0]),
+			dataId: o2did(params[1]),
+			dataValue: o2d(params[2]),
+			propTimeS: propTime,         
+			propagationTimeS: propTime,     
+			azimuthDeg: o2d(params[4])
+		};
+	}
 
     function parseAQPNGSettings(params) {
         return {
