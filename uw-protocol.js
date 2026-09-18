@@ -208,57 +208,68 @@ const UWProtocol = (() => {
         return '$' + core + '*' + cs.toString(16).toUpperCase().padStart(2, '0') + '\r\n';
     }
 
-    function parseNMEA(rawLine) {
-        if (!rawLine || rawLine.length === 0) return null;
+	function parseNMEA(rawLine) {
+		if (!rawLine || rawLine.length === 0) return null;
 
-        const line = rawLine.trim();
-        if (!line.startsWith('$')) return null;
+		let line = rawLine.trim();
+		
+		// Ищем начало NMEA-предложения '$PUWV'
+		// Модем может присылать мусор перед ним: '$PUD$PUWV4...', '$$PUWV4...', 'xx$PUWV4...'
+		const startIdx = line.indexOf('$PUWV');
+		if (startIdx < 0) return null;
+		
+		line = line.substring(startIdx);
+		
+		// Убираем дублирующиеся '$' (сбой UART)
+		while (line.length > 1 && line.charAt(1) === '$') {
+			line = line.substring(1);
+		}
+		
+		const chkIdx = line.indexOf('*');
+		let core, declaredCs;
 
-        const chkIdx = line.indexOf('*');
-        let core, declaredCs;
+		if (chkIdx >= 0) {
+			core = line.substring(1, chkIdx);
+			declaredCs = line.substring(chkIdx + 1);
+		} else {
+			core = line.substring(1);
+			declaredCs = null;
+		}
 
-        if (chkIdx >= 0) {
-            core = line.substring(1, chkIdx);
-            declaredCs = line.substring(chkIdx + 1);
-        } else {
-            core = line.substring(1);
-            declaredCs = null;
-        }
+		if (declaredCs) {
+			const realCs = nmeaChecksum(core);
+			if (realCs !== parseInt(declaredCs, 16)) {
+				return { valid: false, error: 'checksum', raw: rawLine };
+			}
+		}
 
-        if (declaredCs) {
-            const realCs = nmeaChecksum(core);
-            if (realCs !== parseInt(declaredCs, 16)) {
-                return { valid: false, error: 'checksum', raw: rawLine };
-            }
-        }
+		const fields = core.split(',');
+		if (fields.length === 0) return null;
 
-        const fields = core.split(',');
-        if (fields.length === 0) return null;
+		const header = fields[0];
+		if (!header.startsWith('P') || header.length < 5) return null;
 
-        const header = fields[0];
-        if (!header.startsWith('P') || header.length < 5) return null;
+		const manufacturer = header.substring(1, 4);
+		if (manufacturer !== ManufacturerCode) return null;
 
-        const manufacturer = header.substring(1, 4);
-        if (manufacturer !== ManufacturerCode) return null;
+		const sentenceId = header.substring(4);
+		const params = fields.slice(1).map(f => {
+			if (f === '') return null;
+			if (f.startsWith('0x') || f.startsWith('0X')) return hexToBytes(f);
+			if (/^-?\d+\.\d+$/.test(f)) return parseFloat(f);
+			if (/^-?(0|[1-9]\d{0,14})$/.test(f)) return parseInt(f, 10);
+			return f;
+		});
 
-        const sentenceId = header.substring(4);
-        const params = fields.slice(1).map(f => {
-            if (f === '') return null;
-            if (f.startsWith('0x') || f.startsWith('0X')) return hexToBytes(f);
-            if (/^-?\d+$/.test(f)) return parseInt(f, 10);
-            if (/^-?\d+\.\d+$/.test(f)) return parseFloat(f);
-            return f;
-        });
-
-        return {
-            manufacturer,
-            sentenceId,
-            params,
-            valid: true,
-            raw: rawLine,
-            ic: icsByMsgID(sentenceId)
-        };
-    }
+		return {
+			manufacturer,
+			sentenceId,
+			params,
+			valid: true,
+			raw: rawLine,
+			ic: icsByMsgID(sentenceId)
+		};
+	}
 
     // ======================== ПАРСЕРЫ ОТВЕТОВ ========================
     
@@ -277,8 +288,7 @@ const UWProtocol = (() => {
 			type: 'rcResponse',
 			txChID: o2i(params[0]),
 			rcCmdID: o2rc(params[1]),
-			propTimeS: propTime,     
-			propTimeSec: propTime,   
+			propTimeS: propTime,			
 			msrDb: o2d(params[3]),
 			value: o2d(params[4]),
 			azimuthDeg: azimuth,
@@ -394,8 +404,7 @@ const UWProtocol = (() => {
 			targetPtAddress: o2i(params[0]),
 			dataId: o2did(params[1]),
 			dataValue: o2d(params[2]),
-			propTimeS: propTime,         
-			propagationTimeS: propTime,     
+			propTimeS: propTime,
 			azimuthDeg: o2d(params[4])
 		};
 	}

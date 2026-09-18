@@ -149,35 +149,56 @@ class UWPort extends EventTarget {
         this.timerCnt = 0;
     }
 
-    _timerTick() {
-        this.timerCnt++;
-        if (this.timerCnt >= this.timerCntMax) {
-            this._stopTimer();
-            
-            if (this.detected) {
-                this._emit('timeout', { queryID: this.lastQueryID });
-                this.isWaitingLocal = false;
-                this.isWaitingRemote = false;
-                this._emit('stateChanged');
-            } else {
-                this.connecting = false;
-                this._emit('error', { message: 'Timeout waiting for device response' });
-            }
-        }
-    }
+	_timerTick() {
+		this.timerCnt++;
+		if (this.timerCnt >= this.timerCntMax) {
+			this._stopTimer();
+			
+			const wasWaitingLocal = this.isWaitingLocal;
+			const wasWaitingRemote = this.isWaitingRemote;
+			
+			// Флаги сбрасываем ВСЕГДА — независимо от detected
+			this.isWaitingLocal = false;
+			this.isWaitingRemote = false;
+			
+			if (this.detected) {
+				this._emit('timeout', { queryID: this.lastQueryID });
+				// detected НЕ сбрасываем
+			} else {
+				this.connecting = false;
+				this._emit('error', { message: 'Timeout waiting for device response' });
+			}
+			
+			if (wasWaitingLocal || wasWaitingRemote) {
+				this._emit('stateChanged');
+			}
+		}
+	}
 
     // ======================== ОБРАБОТКА ВХОДЯЩИХ ========================
     
 	_onNMEAMessage(rawLine) {
-		//this._resetTimer();
-		this._emit('log', { message: `RCV >> ${rawLine.trim()}` });
-		
-		// Логируем в Logger если доступен
-		if (typeof Logger !== 'undefined' && Logger.logIncoming) {
-			Logger.logIncoming('UWV', rawLine.trim());
+		try {
+			this._emit('log', { message: `RCV >> ${rawLine.trim()}` });
+		} catch (e) {
+			console.error('[UWPort] log emit error:', e.message, e.stack);
 		}
 		
-		const parsed = UWProtocol.parse(rawLine);
+		try {
+			if (typeof Logger !== 'undefined' && Logger.logIncoming) {
+				Logger.logIncoming('UWV', rawLine.trim());
+			}
+		} catch (e) {
+			console.error('[UWPort] Logger.logIncoming error:', e.message, e.stack);
+		}
+		
+		let parsed;
+		try {
+			parsed = UWProtocol.parse(rawLine);
+		} catch (e) {
+			console.error('[UWPort] parse error:', e.message, e.stack);
+			return;
+		}
 		
 		if (!parsed) return;
 		
@@ -194,7 +215,11 @@ class UWPort extends EventTarget {
 			this._emit('stateChanged');
 		}
 		
-		this._processIncoming(parsed);
+		try {
+			this._processIncoming(parsed);
+		} catch (e) {
+			console.error('[UWPort] processIncoming error:', e.message, e.stack);
+		}
 	}
 
     _processIncoming(parsed) {

@@ -123,8 +123,7 @@ class UWDeviceManager extends EventTarget {
 				azimuthDeg: NaN,
 				elevationDeg: NaN,
 				depthM: NaN,
-				propTimeS: NaN,
-				propTimeSec: NaN,
+				propTimeS: NaN,				
 				msrDB: NaN,
 				
 				temperatureC: NaN,
@@ -231,47 +230,38 @@ class UWDeviceManager extends EventTarget {
 		
 		const device = this.getOrCreateDevice(address, type, rx);
 		
-		// Нормализуем propagation time из любого источника
-		const propTime = response.propTimeS 
-					  ?? response.propTimeSec 
-					  ?? response.propagationTimeS;
-		
-		if (Number.isFinite(propTime) && propTime > 0) {
-			device.propTimeS = propTime;             // ← единое имя
-			device.propTimeSec = propTime;           // ← для совместимости
+		if (Number.isFinite(response.propTimeS)) {
+			device.propTimeS = response.propTimeS;
 		}
-		
-		// Обновляем данные
-		if (!isNaN(response.azimuthDeg)) {
+			
+		if (Number.isFinite(response.azimuthDeg)) {
 			device.azimuthDeg = response.azimuthDeg;
 			device.isUSBL = true;
 		}
 		
-		if (!isNaN(response.msrDb)) {
+		if (Number.isFinite(response.msrDb)) {
 			device.msrDB = response.msrDb;
 		}
-        
-        if (!isNaN(response.value)) {
-            // Определяем тип значения по команде
-            if (response.rcCmdID === UWProtocol.RC_CODES.RC_DPT_GET) {
-                device.depthM = response.value;
-            } else if (response.rcCmdID === UWProtocol.RC_CODES.RC_TMP_GET) {
-                device.temperatureC = response.value;
-            } else if (response.rcCmdID === UWProtocol.RC_CODES.RC_BAT_V_GET) {
-                device.voltageV = response.value;
-            }
-        }
-        
-        if (!isNaN(response.dataValue)) {
-            // Для пакетного режима
-            if (response.dataId === UWProtocol.DataID.DID_DPT) {
-                device.depthM = response.dataValue;
-            } else if (response.dataId === UWProtocol.DataID.DID_TMP) {
-                device.temperatureC = response.dataValue;
-            } else if (response.dataId === UWProtocol.DataID.DID_BAT) {
-                device.voltageV = response.dataValue;
-            }
-        }
+		
+		if (Number.isFinite(response.value)) {
+			if (response.rcCmdID === UWProtocol.RC_CODES.RC_DPT_GET) {
+				device.depthM = response.value;
+			} else if (response.rcCmdID === UWProtocol.RC_CODES.RC_TMP_GET) {
+				device.temperatureC = response.value;
+			} else if (response.rcCmdID === UWProtocol.RC_CODES.RC_BAT_V_GET) {
+				device.voltageV = response.value;
+			}
+		}
+		
+		if (Number.isFinite(response.dataValue)) {
+			if (response.dataId === UWProtocol.DataID.DID_DPT) {
+				device.depthM = response.dataValue;
+			} else if (response.dataId === UWProtocol.DataID.DID_TMP) {
+				device.temperatureC = response.dataValue;
+			} else if (response.dataId === UWProtocol.DataID.DID_BAT) {
+				device.voltageV = response.dataValue;
+			}
+		}
         
         // Обновляем статус
         device.isTimeout = false;

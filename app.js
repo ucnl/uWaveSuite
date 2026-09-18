@@ -388,16 +388,10 @@ const UWApp = (() => {
 	function handleRCResponse(response) {
 		const rxChID = response.rxChID !== undefined ? response.rxChID : response.txChID;
 		
-		// Нормализуем имя поля propagation time для deviceManager
-		const propTime = response.propTimeS 
-					  ?? response.propTimeSec 
-					  ?? response.propagationTimeS;
-		
 		const device = deviceManager.processResponse({
 			...response,
 			address: response.txChID,
 			rxChID: rxChID,
-			propTimeS: propTime,        // ← единое имя
 			type: 'cdma'
 		});
 		
@@ -420,7 +414,6 @@ const UWApp = (() => {
 		if (trackingEngine && trackingEngine.isActive) {
 			trackingEngine._handleTrackingResult({
 				address: response.txChID,
-				propTimeS: propTime,    // ← единое имя
 				result: response,
 				type: 'cdma'
 			});
@@ -530,16 +523,11 @@ const UWApp = (() => {
 	}
 
 	function handlePacketResponse(data) {
-		// Нормализуем имя поля propagation time
-		const propTime = data.propTimeS 
-					  ?? data.propTimeSec 
-					  ?? data.propagationTimeS;
-		
+				
 		// Обновляем устройство через deviceManager
 		const device = deviceManager.processResponse({
 			...data,
 			address: data.targetPtAddress,
-			propTimeS: propTime,        // ← единое имя
 			type: 'logical'
 		});
 		
@@ -560,8 +548,7 @@ const UWApp = (() => {
 		// Уведомляем trackingEngine — ВСЕГДА
 		if (trackingEngine && trackingEngine.isActive) {
 			trackingEngine._handleTrackingResult({
-				address: data.targetPtAddress,
-				propTimeS: propTime,    // ← единое имя
+				address: data.targetPtAddress,				
 				result: data,
 				type: 'logical'
 			});

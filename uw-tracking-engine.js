@@ -325,31 +325,20 @@ class UWTrackingEngine extends EventTarget {
     /**
      * Обработать результат трекинга
      */
-	_handleTrackingResult(result) {
+	_handleTrackingResult(data) {
 		this.stats.successful++;
 		
-		// Определяем тип адресации из result
-		const type = result.type || 'cdma';
-		
-		// Нормализуем имя propagation time
-		const propTime = result.propTimeS 
-					  ?? result.propTimeSec 
-					  ?? result.propagationTimeS;
+		const type = data.type || 'cdma';
+		const response = data.result || data;  
+		const address = data.address || response.txChID || response.targetPtAddress;
 		
 		const device = this.deviceManager.processResponse({
-			...result,
-			address: result.address,
-			propTimeS: propTime,        
+			...response,       
+			address: address,
 			type: type
 		});
 		
-		this._emit('result', {
-			device,
-			result,
-			timestamp: Date.now()
-		});
-		
-		// Переходим к следующему устройству
+		this._emit('result', { device, result: response, timestamp: Date.now() });
 		this._advanceToNextDevice();
 	}
 

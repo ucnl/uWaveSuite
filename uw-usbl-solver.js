@@ -162,40 +162,51 @@ const UWUSBLsolver = (() => {
         if (!beacon) return null;
         
         try {
-            // Проверяем обязательные данные
-            if (isNaN(beacon.propTimeS) || beacon.propTimeS <= 0) {
-                if (!isNaN(beacon.azimuthDeg)) {
-                    return beacon; // Только азимут, без дальности
-                }
-                return null;
-            }
-            
-            // Вычисляем дальность по времени и скорости звука
-            if (!isNaN(beacon.propTimeS)) {
-                const sos = (state.soundSpeedMps > 0) ? state.soundSpeedMps : DEFAULT_SOUND_SPEED_MPS;
-                beacon.slantRangeM = beacon.propTimeS * sos;
-                
-                // Вычисляем проекцию
-                if (!isNaN(state.antennaDepthM) && !isNaN(beacon.depthM)) {
-                    const projection = slantRangeProjection(state.antennaDepthM, beacon.depthM, beacon.slantRangeM);
-                    beacon.slantRangeProjectionM = projection;
-                } else {
-                    beacon.slantRangeProjectionM = beacon.slantRangeM;
-                }
-            }
-            
-            let hasProjection = !isNaN(beacon.slantRangeProjectionM) && beacon.slantRangeProjectionM > 0;
-            let projectionM = beacon.slantRangeProjectionM;
-            
-            if (!hasProjection && !isNaN(beacon.slantRangeM) && beacon.slantRangeM > 0) {
-                projectionM = beacon.slantRangeM;
-                beacon.slantRangeProjectionM = projectionM;
-                hasProjection = true;
-            }
-            
-            beacon.isTimeout = false;
-            beacon.succeededRequests++;
-            beacon.dataAge = 0;
+			// Проверяем обязательные данные.
+			// propTimeS может быть отрицательным — это нормально (знаковое время
+			// от модема относительно опорного момента).
+			// Единственное невалидное значение — NaN (парсер не смог прочитать).
+			if (!Number.isFinite(beacon.propTimeS)) {
+				if (Number.isFinite(beacon.azimuthDeg)) {
+					return beacon; // Только азимут, без дальности
+				}
+				return null;
+			}
+			
+			// Дальность = |propTimeS| * скорость звука.
+			// Знак времени не влияет на дальность (дальность — скаляр).
+			const absPropTime = Math.abs(beacon.propTimeS);
+			if (absPropTime === 0) {
+				if (Number.isFinite(beacon.azimuthDeg)) {
+					return beacon;
+				}
+				return null;
+			}
+			
+			const sos = (state.soundSpeedMps > 0) ? state.soundSpeedMps : DEFAULT_SOUND_SPEED_MPS;
+			beacon.slantRangeM = absPropTime * sos;
+			
+			// Вычисляем проекцию
+			if (Number.isFinite(state.antennaDepthM) && Number.isFinite(beacon.depthM)) {
+				const projection = slantRangeProjection(state.antennaDepthM, beacon.depthM, beacon.slantRangeM);
+				beacon.slantRangeProjectionM = projection;
+			} else {
+				beacon.slantRangeProjectionM = beacon.slantRangeM;
+			}
+			
+			let hasProjection = Number.isFinite(beacon.slantRangeProjectionM) && beacon.slantRangeProjectionM > 0;
+			let projectionM = beacon.slantRangeProjectionM;
+			
+			if (!hasProjection && Number.isFinite(beacon.slantRangeM) && beacon.slantRangeM > 0) {
+				projectionM = beacon.slantRangeM;
+				beacon.slantRangeProjectionM = projectionM;
+				hasProjection = true;
+			}
+			
+			beacon.isTimeout = false;
+			if (!Number.isFinite(beacon.succeededRequests)) beacon.succeededRequests = 0;
+			beacon.succeededRequests++;
+			beacon.dataAge = 0;
             
             // ========== ДЕКАРТОВ РЕЖИМ (НЕПОДВИЖНАЯ АНТЕННА) ==========
             if (state.antennaMode === 'cartesian_fixed') {
