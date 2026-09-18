@@ -1,4 +1,4 @@
-const CACHE = 'uwave-v15';   // ← сменил версию, чтобы SW переустановился
+const CACHE = 'uwave-v16';
 
 const ASSETS = [
 	'./',
