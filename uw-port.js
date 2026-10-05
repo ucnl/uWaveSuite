@@ -162,7 +162,11 @@ class UWPort extends EventTarget {
 			this.isWaitingRemote = false;
 			
 			if (this.detected) {
-				this._emit('timeout', { queryID: this.lastQueryID });
+				this._emit('timeout', {
+					queryID: this.lastQueryID,
+					wasLocal: wasWaitingLocal,
+					wasRemote: wasWaitingRemote
+				});
 				// detected НЕ сбрасываем
 			} else {
 				this.connecting = false;

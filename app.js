@@ -3,7 +3,7 @@
 
 const UWApp = (() => {
 
-    const APP_VERSION = '0.5.0';
+    const APP_VERSION = '0.5.1';
     const APP_NAME = 'uWaveSuite';
 
     // ========== DOM ЭЛЕМЕНТЫ ==========
@@ -199,6 +199,15 @@ const UWApp = (() => {
 				UIChat.addOutgoing('timeout', e.detail);
 			}
         });
+		
+		uwPort.addEventListener('timeout', (e) => {
+			addConsoleMessage(
+				`Локальный таймаут: ${e.detail.queryID}` +
+				(e.detail.wasRemote ? ' (ожидание remote)' : ' (ожидание ACK)'),
+				'warning',
+				'PORT'
+			);
+		});
         
         uwPort.addEventListener('rcAsyncIn', (e) => {
             handleRCAsyncIn(e.detail);
@@ -311,6 +320,14 @@ const UWApp = (() => {
         trackingEngine.addEventListener('error', (e) => {
             addConsoleMessage(`Ошибка трекинга: ${e.detail.error.message}`, 'error', 'TRACK');
         });
+		
+		trackingEngine.addEventListener('watchdog', (e) => {
+			addConsoleMessage(
+				`WATCHDOG: принудительный переход (device ${e.detail.currentDeviceIndex}/${e.detail.devicesCount})`,
+				'warning',
+				'TRACK'
+			);
+		});
     }
 
     // ========== ОБРАБОТЧИКИ СОБЫТИЙ ==========
@@ -386,6 +403,17 @@ const UWApp = (() => {
 	}
 
 	function handleRCResponse(response) {
+		// Если трекинг активен — он сам обработает через trackingEngine._handleTrackingResult
+		if (trackingEngine && trackingEngine.isActive) {
+			trackingEngine._handleTrackingResult({
+				address: response.txChID,
+				result: response,
+				type: 'cdma'
+			});
+			return;
+		}
+		
+		// Если трекинг НЕ активен — обрабатываем сами
 		const rxChID = response.rxChID !== undefined ? response.rxChID : response.txChID;
 		
 		const device = deviceManager.processResponse({
@@ -397,7 +425,6 @@ const UWApp = (() => {
 		
 		if (device) {
 			const solved = UWUSBLsolver.solveUSBL(device);
-			
 			if (solved) {
 				addTrackPoint(solved);
 				updateDevicesBar();
@@ -409,33 +436,22 @@ const UWApp = (() => {
 			msg += ` msr=${response.msrDb.toFixed(1)}dB`;
 			addConsoleMessage(msg, 'success', 'RC');
 		}
-		
-		// Уведомляем trackingEngine
-		if (trackingEngine && trackingEngine.isActive) {
-			trackingEngine._handleTrackingResult({
-				address: response.txChID,
-				result: response,
-				type: 'cdma'
-			});
-		}
 	}
 
 	function handleRCTimeout(response) {
 		const rxChID = response.rxChID !== undefined ? response.rxChID : response.txChID;
+		
+		// Если трекинг активен — он сам обработает через port.rcTimeout
+		if (trackingEngine && trackingEngine.isActive) {
+			return;
+		}
+		
+		// Если трекинг НЕ активен — обрабатываем сами
 		const device = deviceManager.processTimeout(response.txChID, 'cdma', rxChID);
 		
 		if (device) {
 			addConsoleMessage(`Tx=${response.txChID} Rx=${rxChID} >> timeout`, 'warning', 'RC');
 			updateDevicesBar();
-		}
-		
-		// Уведомляем trackingEngine
-		if (trackingEngine && trackingEngine.isActive) {
-			trackingEngine._handleTrackingError({
-				address: response.txChID,
-				rxChID: rxChID,
-				error: new Error('timeout')
-			});
 		}
 	}
 
@@ -503,6 +519,17 @@ const UWApp = (() => {
 	}
 
 	function handlePacketRequestTimeout(data) {
+		// Если трекинг активен — он сам обработает через _handleTrackingError
+		if (trackingEngine && trackingEngine.isActive) {
+			trackingEngine._handleTrackingError({
+				address: data.targetPtAddress,
+				type: 'logical',
+				error: new Error('ITG timeout')
+			});
+			return;
+		}
+		
+		// Если трекинг НЕ активен — обрабатываем сами
 		const device = deviceManager.processTimeout(data.targetPtAddress, 'logical');
 		
 		if (device) {
@@ -511,20 +538,20 @@ const UWApp = (() => {
 			addConsoleMessage(msg, 'warning', 'PT');
 			updateDevicesBar();
 		}
-		
-		// Уведомляем trackingEngine
-		if (trackingEngine && trackingEngine.isActive) {
-			trackingEngine._handleTrackingError({
-				address: data.targetPtAddress,
-				type: 'logical',
-				error: new Error('ITG timeout')
-			});
-		}
 	}
 
 	function handlePacketResponse(data) {
-				
-		// Обновляем устройство через deviceManager
+		// Если трекинг активен — он сам обработает через trackingEngine._handleTrackingResult
+		if (trackingEngine && trackingEngine.isActive) {
+			trackingEngine._handleTrackingResult({
+				address: data.targetPtAddress,
+				result: data,
+				type: 'logical'
+			});
+			return;
+		}
+		
+		// Если трекинг НЕ активен — обрабатываем сами
 		const device = deviceManager.processResponse({
 			...data,
 			address: data.targetPtAddress,
@@ -543,15 +570,6 @@ const UWApp = (() => {
 			if (Number.isFinite(data.dataValue)) msg += ` value=${data.dataValue.toFixed(2)}`;
 			if (Number.isFinite(data.azimuthDeg)) msg += ` az=${data.azimuthDeg.toFixed(1)}°`;
 			addConsoleMessage(msg, 'success', 'PT');
-		}
-		
-		// Уведомляем trackingEngine — ВСЕГДА
-		if (trackingEngine && trackingEngine.isActive) {
-			trackingEngine._handleTrackingResult({
-				address: data.targetPtAddress,				
-				result: data,
-				type: 'logical'
-			});
 		}
 	}
 

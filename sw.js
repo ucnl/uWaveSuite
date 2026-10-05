@@ -1,4 +1,4 @@
-const CACHE = 'uwave-v17';
+const CACHE = 'uwave-v19';
 
 const ASSETS = [
 	'./',
@@ -46,6 +46,8 @@ const ASSETS = [
 	'./modules/ui-map.js',
 	'./modules/ui-ruler.js',
 	'./modules/ui-topo.js',
+	'./CHANGELOG.html', 
+	'./docs/guide.html',
 ];
 
 self.addEventListener('install', (event) => {
@@ -87,12 +89,13 @@ self.addEventListener('fetch', (event) => {
 		return;
 	}
 	
-	// Навигационные запросы (открытие страницы) — отдаём index.html из кэша.
-	// Это покрывает случай, когда лаунчер добавляет ?native=1 к URL.
 	if (event.request.mode === 'navigate') {
 		event.respondWith(
-			caches.match('./index.html', { ignoreSearch: true }).then((cached) => {
-				return cached || fetch(event.request);
+			caches.match(event.request, { ignoreSearch: true }).then((cached) => {
+				if (cached) return cached;
+				return caches.match('./index.html').then((index) => {
+					return index || fetch(event.request);
+				});
 			})
 		);
 		return;

@@ -18,6 +18,8 @@ class UWTrackingEngine extends EventTarget {
         // Таймеры
         this.trackingTimer = null;
         this.currentDeviceIndex = 0;
+		
+		this.watchdogTimer = null;
         
         // Настройки
         this.config = {
@@ -42,6 +44,7 @@ class UWTrackingEngine extends EventTarget {
             successful: 0,                  // Успешных
             failed: 0,                      // Ошибок
             timeouts: 0,                    // Таймаутов
+			watchdogFires: 0, 
             lastCycleTime: 0,               // Время последнего цикла
             averageCycleTime: 0             // Среднее время цикла
         };
@@ -50,122 +53,162 @@ class UWTrackingEngine extends EventTarget {
         this._wireEvents();
     }
 
-    _wireEvents() {
-        // Результаты трекинга
-        this.queueManager.addEventListener('trackingResult', (e) => {
-            this._handleTrackingResult(e.detail);
-        });
-        
-        this.queueManager.addEventListener('trackingError', (e) => {
-            this._handleTrackingError(e.detail);
-        });
-        
-        // Изменение состояния порта
-        this.port.addEventListener('stateChanged', () => {
-            if (!this.port.isOpen && this.isActive) {
-                this.stop('Порт закрыт');
-            }
-        });
-        
-        // Изменение конфигурации устройств
-        this.deviceManager.addEventListener('trackingConfigChanged', (e) => {
-            this.config.devices = e.detail.devices;
-            this.config.intervalMs = e.detail.intervalMs || this.config.intervalMs;
-        });
-    }
+	_wireEvents() {
+		// Результаты трекинга
+		this.queueManager.addEventListener('trackingResult', (e) => {
+			this._handleTrackingResult(e.detail);
+		});
+		
+		this.queueManager.addEventListener('trackingError', (e) => {
+			this._handleTrackingError(e.detail);
+		});
+		
+		// Изменение состояния порта
+		this.port.addEventListener('stateChanged', () => {
+			if (!this.port.isOpen && this.isActive) {
+				this.stop('Порт закрыт');
+			}
+		});
+		
+		// Изменение конфигурации устройств
+		this.deviceManager.addEventListener('trackingConfigChanged', (e) => {
+			this.config.devices = e.detail.devices;
+			this.config.intervalMs = e.detail.intervalMs || this.config.intervalMs;
+		});
+		
+		// === НОВОЕ: локальный таймаут порта (ACK/response не пришли) ===
+		this.port.addEventListener('timeout', (e) => {
+			if (!this.isActive || this.isPaused) return;
+			
+			this._handleTrackingError({
+				address: null,
+				rxChID: null,
+				error: new Error(`Port timeout: ${e.detail.queryID}`),
+				source: 'port'
+			});
+		});
+		
+		// === НОВОЕ: RC timeout от модема ===
+		this.port.addEventListener('rcTimeout', (e) => {
+			if (!this.isActive || this.isPaused) return;
+			
+			this._handleTrackingError({
+				address: e.detail.txChID,
+				rxChID: e.detail.rxChID,
+				error: new Error('RC timeout'),
+				source: 'rc'
+			});
+		});
+	}
 
     // ======================== УПРАВЛЕНИЕ ТРЕКИНГОМ ========================
     
     /**
      * Запустить трекинг
      */
-    start() {
-        if (this.isActive) {
-            this._emit('warning', { message: 'Трекинг уже запущен' });
-            return false;
-        }
-        
-        if (!this.port.isOpen || !this.port.detected) {
-            this._emit('error', { message: 'Порт не готов' });
-            return false;
-        }
-        
-        if (this.config.devices.length === 0) {
-            this._emit('error', { message: 'Нет устройств для трекинга' });
-            return false;
-        }
-        
-        this.isActive = true;
-        this.isPaused = false;
-        this.currentDeviceIndex = 0;
-        
-        this._emit('started', {
-            devices: this.config.devices,
-            intervalMs: this.config.intervalMs
-        });
-        
-        // Запускаем первый опрос
-        this._scheduleNextRequest(0);
-        
-        return true;
-    }
+	start() {
+		if (this.isActive) {
+			this._emit('warning', { message: 'Трекинг уже запущен' });
+			return false;
+		}
+		
+		if (!this.port.isOpen || !this.port.detected) {
+			this._emit('error', { message: 'Порт не готов' });
+			return false;
+		}
+		
+		if (this.config.devices.length === 0) {
+			this._emit('error', { message: 'Нет устройств для трекинга' });
+			return false;
+		}
+		
+		this.isActive = true;
+		this.isPaused = false;
+		this.currentDeviceIndex = 0;
+		
+		this._emit('started', {
+			devices: this.config.devices,
+			intervalMs: this.config.intervalMs
+		});
+		
+		// Запускаем первый опрос
+		this._scheduleNextRequest(0);
+		
+		// Запускаем watchdog
+		this._resetWatchdog();
+		
+		return true;
+	}
 
     /**
      * Остановить трекинг
      */
-    stop(reason = 'Вручную') {
-        if (!this.isActive) {
-            return false;
-        }
-        
-        this.isActive = false;
-        this.isPaused = false;
-        
-        if (this.trackingTimer) {
-            clearTimeout(this.trackingTimer);
-            this.trackingTimer = null;
-        }
-        
-        this._emit('stopped', { reason });
-        
-        return true;
-    }
+	stop(reason = 'Вручную') {
+		if (!this.isActive) {
+			return false;
+		}
+		
+		this.isActive = false;
+		this.isPaused = false;
+		
+		if (this.trackingTimer) {
+			clearTimeout(this.trackingTimer);
+			this.trackingTimer = null;
+		}
+		
+		// Останавливаем watchdog
+		if (this.watchdogTimer) {
+			clearTimeout(this.watchdogTimer);
+			this.watchdogTimer = null;
+		}
+		
+		this._emit('stopped', { reason });
+		
+		return true;
+	}
 
     /**
      * Пауза трекинга
      */
-    pause() {
-        if (!this.isActive || this.isPaused) {
-            return false;
-        }
-        
-        this.isPaused = true;
-        
-        if (this.trackingTimer) {
-            clearTimeout(this.trackingTimer);
-            this.trackingTimer = null;
-        }
-        
-        this._emit('paused');
-        
-        return true;
-    }
+	pause() {
+		if (!this.isActive || this.isPaused) {
+			return false;
+		}
+		
+		this.isPaused = true;
+		
+		if (this.trackingTimer) {
+			clearTimeout(this.trackingTimer);
+			this.trackingTimer = null;
+		}
+		
+		// Останавливаем watchdog на паузе
+		if (this.watchdogTimer) {
+			clearTimeout(this.watchdogTimer);
+			this.watchdogTimer = null;
+		}
+		
+		this._emit('paused');
+		
+		return true;
+	}
 
     /**
      * Возобновить трекинг
      */
-    resume() {
-        if (!this.isActive || !this.isPaused) {
-            return false;
-        }
-        
-        this.isPaused = false;
-        this._scheduleNextRequest(0);
-        
-        this._emit('resumed');
-        
-        return true;
-    }
+	resume() {
+		if (!this.isActive || !this.isPaused) {
+			return false;
+		}
+		
+		this.isPaused = false;
+		this._scheduleNextRequest(0);
+		this._resetWatchdog();
+		
+		this._emit('resumed');
+		
+		return true;
+	}
 
     // ======================== ЦИКЛ ОПРОСА ========================
     
@@ -187,10 +230,59 @@ class UWTrackingEngine extends EventTarget {
             this._sendNextRequest();
         }, delay);
     }
+	
+	/**
+	 * Сбросить watchdog (перезапустить таймер).
+	 * Вызывается при каждом событии трекинга (успех, ошибка, таймаут).
+	 */
+	_resetWatchdog() {
+		if (!this.isActive || this.isPaused) return;
+		
+		if (this.watchdogTimer) {
+			clearTimeout(this.watchdogTimer);
+		}
+		
+		// Таймаут watchdog: интервал * 2 + запас на remote timeout (6с)
+		const watchdogMs = Math.max(
+			this.config.intervalMs * 2 + 6000,
+			5000
+		);
+		
+		this.watchdogTimer = setTimeout(() => {
+			this._onWatchdogFire();
+		}, watchdogMs);
+	}
 
-    /**
-     * Отправить следующий запрос
-     */
+	/**
+	 * Срабатывание watchdog — принудительный переход к следующему устройству.
+	 */
+	_onWatchdogFire() {
+		if (!this.isActive || this.isPaused) return;
+		
+		this.watchdogTimer = null;
+		
+		this.stats.watchdogFires = (this.stats.watchdogFires || 0) + 1;
+		
+		this._emit('watchdog', {
+			currentDeviceIndex: this.currentDeviceIndex,
+			devicesCount: this.config.devices.length,
+			timestamp: Date.now()
+		});
+		
+		// Принудительно сбрасываем флаги порта
+		if (this.port) {
+			this.port.isWaitingLocal = false;
+			this.port.isWaitingRemote = false;
+			this.port._stopTimer();
+		}
+		
+		// Переходим к следующему устройству
+		this._advanceToNextDevice();
+	}
+
+	/**
+	 * Отправить следующий запрос
+	 */
 	_sendNextRequest() {
 		if (!this.isActive || this.isPaused) return;
 		
@@ -276,8 +368,11 @@ class UWTrackingEngine extends EventTarget {
 			});
 		}
 		
-		// Планируем следующий запрос через интервал
-		this._scheduleNextRequest(this.config.intervalMs);
+		// Планируем следующий запрос 
+		this._scheduleNextRequest(0);
+		
+		// Сбрасываем watchdog
+		this._resetWatchdog();
 	}
 
     /**
@@ -351,13 +446,15 @@ class UWTrackingEngine extends EventTarget {
 		
 		const type = data.type || 'cdma';
 		
-		if (data.address !== undefined) {
-			this.deviceManager.processTimeout(data.address, type);
+		// Обрабатываем таймаут устройства только если известен адрес
+		if (data.address !== undefined && data.address !== null) {
+			this.deviceManager.processTimeout(data.address, type, data.rxChID);
 		}
 		
 		this._emit('error', {
 			address: data.address,
 			error: data.error,
+			source: data.source || 'unknown',
 			timestamp: Date.now()
 		});
 		
@@ -478,6 +575,7 @@ class UWTrackingEngine extends EventTarget {
             successful: 0,
             failed: 0,
             timeouts: 0,
+			watchdogFires: 0, 
             lastCycleTime: 0,
             averageCycleTime: 0
         };

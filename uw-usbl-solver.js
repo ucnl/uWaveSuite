@@ -176,21 +176,19 @@ const UWUSBLsolver = (() => {
 			// Дальность = |propTimeS| * скорость звука.
 			// Знак времени не влияет на дальность (дальность — скаляр).
 			const absPropTime = Math.abs(beacon.propTimeS);
-			if (absPropTime === 0) {
-				if (Number.isFinite(beacon.azimuthDeg)) {
-					return beacon;
-				}
-				return null;
-			}
-			
+
 			const sos = (state.soundSpeedMps > 0) ? state.soundSpeedMps : DEFAULT_SOUND_SPEED_MPS;
 			beacon.slantRangeM = absPropTime * sos;
-			
-			// Вычисляем проекцию
-			if (Number.isFinite(state.antennaDepthM) && Number.isFinite(beacon.depthM)) {
+
+			// Проекцию вычисляем только если есть глубина и slantRange > 0
+			if (Number.isFinite(state.antennaDepthM) && 
+				Number.isFinite(beacon.depthM) && 
+				beacon.slantRangeM > 0) {
+				
 				const projection = slantRangeProjection(state.antennaDepthM, beacon.depthM, beacon.slantRangeM);
 				beacon.slantRangeProjectionM = projection;
 			} else {
+				// При slantRange = 0 — проекция = 0
 				beacon.slantRangeProjectionM = beacon.slantRangeM;
 			}
 			

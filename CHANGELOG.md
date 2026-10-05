@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.5.1] - 2026-10-05
+
+### Исправлено
+- Трекинг зависал при потере ACK/ответа от модема — теперь `UWPort.timeout` доходит до `UWTrackingEngine`
+- Дублирование сообщений о таймауте (`[DEVICE]` и `[RC]` появлялись дважды) при активном трекинге
+- Двойной вызов `deviceManager.processResponse` при ITG/CDMA-ответах (двойной инкремент `succeededRequests`)
+- Пауза между запросами трекинга (ждали `intervalMs` даже при мгновенном ответе) — теперь следующий запрос уходит сразу
+- Наклонная дальность не вычислялась при `propTime = 0` — теперь 0 валидное значение
+- Проекция наклонной дальности считалась при нулевой дальности — теперь только при `slantRange > 0`
+
+### Изменено
+- `UWTrackingEngine._handleTrackingError` сбрасывает `isWaitingLocal`/`isWaitingRemote` и останавливает таймер порта
+- `UWTrackingEngine` подписан на `port.timeout` и `port.rcTimeout` — единый источник таймаута
+- `_advanceToNextDevice` планирует следующий запрос без задержки (`_scheduleNextRequest(0)`)
+- `handleRCTimeout` и `handlePacketRequestTimeout` возвращают управление `trackingEngine`, если трекинг активен (устранён дубль)
+- `handleRCResponse` и `handlePacketResponse` возвращают управление `trackingEngine`, если трекинг активен (устранён дубль `processResponse`)
+- `solveUSBL`: `propTime = 0` даёт `slantRangeM = 0`, проекция не вычисляется
+
+### Добавлено
+- **Watchdog трекинга** — принудительный переход к следующему устройству, если `_advanceToNextDevice` не был вызван за `intervalMs * 2 + 6000` мс
+- Счётчик `stats.watchdogFires`
+- Событие `watchdog` (логируется в консоль как `[TRACK] WATCHDOG`)
+- Логирование `port.timeout` в консоли (`[PORT] Локальный таймаут`)
+
 ## [0.5.0] - 2026-09-18
 
 ### Добавлено
