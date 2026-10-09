@@ -171,9 +171,9 @@ const UWProtocol = (() => {
         return bytes;
     }
 
-    function bytesToHex(bytes) {
-        return '0x' + Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-    }
+	function bytesToHex(bytes) {
+		return '0x' + Array.from(bytes).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join('');
+	}
 
     function icsByMsgID(msgID) {
         return MsgIDToIC[msgID] || ICs.IC_INVALID;
