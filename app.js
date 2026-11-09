@@ -3,7 +3,7 @@
 
 const UWApp = (() => {
 
-    const APP_VERSION = '0.5.1';
+    const APP_VERSION = '0.5.6';
     const APP_NAME = 'uWaveSuite';
 
     // ========== DOM ЭЛЕМЕНТЫ ==========
@@ -31,9 +31,6 @@ const UWApp = (() => {
     // ========== ВОСПРОИЗВЕДЕНИЕ ЛОГА ==========
     let isPlaying = false;
     let playbackSpeed = 1;
-    let playbackTimer = null;
-    let playbackEntries = [];
-    let playbackIndex = 0;
 
     const PLAYBACK_SPEEDS = [1, 2, 4, 8];
 
@@ -61,6 +58,8 @@ const UWApp = (() => {
         
         // Инициализация UI модулей
         initUIModules();
+		
+		initDeviceCardHandlers();
 		
 		// Загрузка VLBL решений из storage
 		if (typeof UWVLBStore !== 'undefined') {
@@ -930,6 +929,13 @@ const UWApp = (() => {
             if (ptsEl) ptsEl.textContent = info.isPTS ? 'yes' : 'no';
         }
     }
+	
+	function fmtNum(v, digits = 1) {
+		if (v == null) return '--';                  // null И undefined
+		const n = Number(v);
+		if (!Number.isFinite(n)) return '--';        // NaN, Infinity, -Infinity
+		return n.toFixed(digits);
+	}
 
 	function updateAntennaInfo() {
 		const st = UWUSBLsolver.getState();
@@ -947,13 +953,13 @@ const UWApp = (() => {
 			lonEl.textContent = 'X=0.00';
 			hdgEl.textContent = '0.0';
 		} else {
-			latEl.textContent = isNaN(st.antennaLatDeg) ? '--' : st.antennaLatDeg.toFixed(6);
-			lonEl.textContent = isNaN(st.antennaLonDeg) ? '--' : st.antennaLonDeg.toFixed(6);
-			hdgEl.textContent = isNaN(st.antennaHeadingDeg) ? '--' : st.antennaHeadingDeg.toFixed(1);
+			latEl.textContent = fmtNum(st.antennaLatDeg, 6);
+			lonEl.textContent = fmtNum(st.antennaLonDeg, 6);
+			hdgEl.textContent = fmtNum(st.antennaHeadingDeg, 1);
 		}
 		
-		if (dptEl) dptEl.textContent = isNaN(st.antennaDepthM) ? '--' : st.antennaDepthM.toFixed(1);
-		if (tmpEl) tmpEl.textContent = isNaN(st.waterTempC) ? '--' : st.waterTempC.toFixed(1);
+		if (dptEl) dptEl.textContent = fmtNum(st.antennaDepthM, 1);
+		if (tmpEl) tmpEl.textContent = fmtNum(st.waterTempC, 1);
 	}
 
     function updateDevicesBar() {
@@ -984,8 +990,10 @@ const UWApp = (() => {
                 : '--';
             
             html += `
-            <div class="device-card ${cardClass}" onclick="UWApp.focusDeviceByAddress(${device.address}, '${device.type}')">
-                <div class="dc-addr">#${device.userAddress}${device.isUSBL ? ' 📡' : ''}</div>
+            <div class="device-card ${cardClass}" 
+			    data-addr="${device.address}" 
+				data-type="${device.type}">
+				<div class="dc-addr">#${device.userAddress}${device.isUSBL ? ' 📡' : ''}</div>
 				<div class="bc-actions">
 					${!isNaN(device.latitudeDeg) && !isNaN(device.longitudeDeg) ? 
 						`<span class="bc-mark" onclick="event.stopPropagation(); UWApp.markBeaconPoint(${device.address}, '${device.type}')" title="Отметить в POI">📌</span>` 
@@ -1009,6 +1017,63 @@ const UWApp = (() => {
         
         devicesBar.innerHTML = html;
     }
+
+	function initDeviceCardHandlers() {
+		if (!devicesBar || devicesBar._cardHandlersAttached) return;
+		devicesBar._cardHandlersAttached = true;
+		
+		let lastTapTime = 0;
+		let lastTapAddr = null;
+		let singleTapTimer = null;
+		
+		devicesBar.addEventListener('click', (e) => {
+			// Клик по 📌 (markBeaconPoint) — не перехватываем
+			if (e.target.closest('.bc-mark')) return;
+			
+			const card = e.target.closest('.device-card');
+			if (!card) return;
+			
+			const addr = parseInt(card.dataset.addr, 10);
+			const type = card.dataset.type;
+			const now = Date.now();
+			
+			// Второй тап в пределах 350 мс по той же карточке → двойной
+			if (now - lastTapTime < 350 && lastTapAddr === addr) {
+				if (singleTapTimer) {
+					clearTimeout(singleTapTimer);
+					singleTapTimer = null;
+				}
+				lastTapTime = 0;
+				lastTapAddr = null;
+				
+				// Двойной клик → centerOnDevice (мгновенный прыжок без слежения)
+				if (typeof UIMap !== 'undefined' && typeof UIMap.centerOnDevice === 'function') {
+					const ok = UIMap.centerOnDevice(addr, type);
+					setStatus(ok ? `🎯 Центр: #${addr}` : `Не удалось центрировать #${addr}`);
+				} else {
+					// Фолбэк — followDevice (если centerOnDevice ещё не добавлен)
+					focusDeviceByAddress(addr, type);
+				}
+				return;
+			}
+			
+			// Первый тап — откладываем одиночный на 350 мс
+			lastTapTime = now;
+			lastTapAddr = addr;
+			
+			if (singleTapTimer) clearTimeout(singleTapTimer);
+			singleTapTimer = setTimeout(() => {
+				singleTapTimer = null;
+				if (lastTapAddr === addr) {
+					lastTapAddr = null;
+					lastTapTime = 0;
+					// Одиночный клик → followDevice (слежение, как было)
+					focusDeviceByAddress(addr, type);
+				}
+			}, 350);
+		});
+	}
+
 
     function addConsoleMessage(message, type = 'info', source = '') {
         if (typeof UIConsole !== 'undefined') {
@@ -1425,23 +1490,39 @@ const UWApp = (() => {
         return PLAYBACK_SPEEDS.indexOf(playbackSpeed);
     }
 
-    function increasePlaybackSpeed() {
-        let idx = getCurrentSpeedIndex();
-        if (idx === -1) idx = 0;
-        const newIdx = (idx + 1) % PLAYBACK_SPEEDS.length;
-        playbackSpeed = PLAYBACK_SPEEDS[newIdx];
-        updatePlaybackSpeedUI();
-        setStatus(`Скорость: ${playbackSpeed}x`);
-    }
+	function increasePlaybackSpeed() {
+		if (typeof Logger === 'undefined') return;
+		
+		const SPEEDS = Logger.SPEEDS;   // [1, 2, 4, 8]
+		let idx = SPEEDS.indexOf(playbackSpeed);
+		if (idx === -1) idx = 0;
+		const next = SPEEDS[(idx + 1) % SPEEDS.length];
+		
+		playbackSpeed = next;
+		updatePlaybackSpeedUI();
+		
+		if (isPlaying) {
+			Logger.setPlaybackSpeed(next);
+		}
+		setStatus(`Скорость: ${playbackSpeed}x`);
+	}
 
-    function decreasePlaybackSpeed() {
-        let idx = getCurrentSpeedIndex();
-        if (idx === -1) idx = 0;
-        const newIdx = (idx - 1 + PLAYBACK_SPEEDS.length) % PLAYBACK_SPEEDS.length;
-        playbackSpeed = PLAYBACK_SPEEDS[newIdx];
-        updatePlaybackSpeedUI();
-        setStatus(`Скорость: ${playbackSpeed}x`);
-    }
+	function decreasePlaybackSpeed() {
+		if (typeof Logger === 'undefined') return;
+		
+		const SPEEDS = Logger.SPEEDS;
+		let idx = SPEEDS.indexOf(playbackSpeed);
+		if (idx === -1) idx = 0;
+		const prev = SPEEDS[(idx - 1 + SPEEDS.length) % SPEEDS.length];
+		
+		playbackSpeed = prev;
+		updatePlaybackSpeedUI();
+		
+		if (isPlaying) {
+			Logger.setPlaybackSpeed(prev);
+		}
+		setStatus(`Скорость: ${playbackSpeed}x`);
+	}
 
     function updatePlaybackSpeedUI() {
         const spanSpeed = document.getElementById('playback-speed-current');
@@ -1453,39 +1534,94 @@ const UWApp = (() => {
         else startPlayback();
     }
 
-    async function startPlayback() {
-        const entries = Logger.getEntries();
-        
-        if (!entries || entries.length === 0) {
-            alert('Нет загруженного лога.');
-            return;
-        }
-        
-        isPlaying = true;
-        playbackEntries = entries;
-        playbackIndex = 0;
-        playbackSpeed = 1;
-        
-        showPlaybackControls();
-        
-        btnConnection.disabled = true;
-        btnGnss.disabled = true;
-        btnTracking.disabled = true;
-        
-        if (trackingEngine && trackingEngine.isActive) {
-            trackingEngine.stop('Воспроизведение');
-        }
-        
-        if (uwPort && uwPort.isOpen) {
-            uwPort.serial.onMessage = null;
-        }
-        if (gnssBridge) {
-            gnssBridge.onMessage = null;
-        }
-        
-        setStatus('▶ Воспроизведение...');
-        processNextPlaybackEntry();
-    }
+	async function startPlayback() {
+		// 1. Проверка — есть ли что играть
+		if (typeof Logger === 'undefined' || Logger.getEntryCount() === 0) {
+			alert('Нет загруженного лога. Сначала: Лог → Открыть.');
+			return;
+		}
+		
+		// 2. Останавливаем трекинг (если был активен)
+		if (trackingEngine && trackingEngine.isActive) {
+			trackingEngine.stop('Воспроизведение');
+		}
+		
+		// 3. Отключаем живой порт и GNSS, чтобы не смешивать с воспроизведением
+		if (uwPort && uwPort.isOpen && uwPort.serial) {
+			uwPort.serial.onMessage = null;
+		}
+		if (gnssBridge) {
+			gnssBridge.onMessage = null;
+		}
+		
+		// 4. Блокируем верхние кнопки, показываем контролы
+		if (btnConnection) btnConnection.disabled = true;
+		if (btnGnss) btnGnss.disabled = true;
+		if (btnTracking) btnTracking.disabled = true;
+		
+		isPlaying = true;
+		playbackSpeed = 1;
+		
+		showPlaybackControls();
+		updatePlaybackSpeedUI();
+		setStatus('▶ Воспроизведение...');
+		
+		// 5. Подписки на Logger
+		Logger.onEntry = (data, ts, originalTime, entry) => {
+			processPlaybackEntry({
+				type: entry.type,
+				level: entry.level,
+				port: entry.port,
+				direction: entry.direction,
+				data: entry.data || entry.message || data,
+				timestamp: entry.timestamp,
+				formatted: entry.formatted
+			});
+		};
+		
+		Logger.onPlaybackProgress = (index, total) => {
+			const fill = document.getElementById('playback-progress-fill');
+			if (fill) {
+				fill.style.width = (total > 0 ? (index / total * 100) : 0) + '%';
+			}
+		};
+		
+		Logger.onPlaybackEnd = () => {
+			// Автоматически вызывается Logger'ом в конце
+			isPlaying = false;
+			hidePlaybackControls();
+			
+			if (btnConnection) btnConnection.disabled = false;
+			if (btnGnss) btnGnss.disabled = false;
+			updateAllButtons();
+			
+			// Восстанавливаем живые обработчики
+			if (uwPort && uwPort.isOpen && uwPort.serial) {
+				uwPort.serial.onMessage = (line) => uwPort._onNMEAMessage(line);
+			}
+			if (gnssBridge) {
+				gnssBridge.onMessage = onGnssMessage;
+			}
+			
+			// Снимаем подписки
+			Logger.onEntry = null;
+			Logger.onPlaybackProgress = null;
+			Logger.onPlaybackEnd = null;
+			
+			setStatus('Воспроизведение завершено');
+		};
+		
+		// 6. Запуск
+		const ok = Logger.startPlayback(playbackSpeed, true, false);
+		if (!ok) {
+			alert('Не удалось запустить воспроизведение (лог пуст?)');
+			isPlaying = false;
+			hidePlaybackControls();
+			if (btnConnection) btnConnection.disabled = false;
+			if (btnGnss) btnGnss.disabled = false;
+			updateAllButtons();
+		}
+	}
 
     function processNextPlaybackEntry() {
         if (!isPlaying) return;
@@ -1518,20 +1654,40 @@ const UWApp = (() => {
         playbackTimer = setTimeout(processNextPlaybackEntry, delay);
     }
 
-    function processPlaybackEntry(entry) {
-        if (!entry || !entry.data) return;
-        
-        const gnssData = GNSSParser.parse(entry.data);
-        if (gnssData) {
-            processGNSSData(gnssData);
-            return;
-        }
-        
-        const parsed = UWProtocol.parse(entry.data);
-        if (parsed && parsed.valid) {
-            processUWData(parsed);
-        }
-    }
+	function processPlaybackEntry(entry) {
+		if (!entry) return;
+		
+		// Достаём строку данных из любого поля
+		const data = entry.data || entry.formatted;
+		if (!data) return;
+		
+		// ===== Пробуем GNSS =====
+		let gnssData = null;
+		if (typeof GNSSParser !== 'undefined' && GNSSParser.parse) {
+			try {
+				gnssData = GNSSParser.parse(data);
+			} catch (e) { /* ignore */ }
+		}
+		if (gnssData) {
+			processGNSSData(gnssData);
+			return;
+		}
+		
+		// ===== Пробуем UW-протокол =====
+		let parsed = null;
+		if (typeof UWProtocol !== 'undefined' && UWProtocol.parse) {
+			try {
+				parsed = UWProtocol.parse(data);
+			} catch (e) { /* ignore */ }
+		}
+		if (parsed && parsed.valid) {
+			processUWData(parsed);
+			return;
+		}
+		
+		// ===== Фолбэк: видно, что мы вообще играем =====
+		addConsoleMessage(`[PLAY] ${data}`, 'debug', 'PLAYBACK');
+	}
 
     function processGNSSData(data) {
         if (UWSettingsStorage.get('antenna.mode') === 'cartesian_fixed') return;
@@ -1601,29 +1757,33 @@ const UWApp = (() => {
         }
     }
 
-    function stopPlayback() {
-        isPlaying = false;
-        
-        if (playbackTimer) {
-            clearTimeout(playbackTimer);
-            playbackTimer = null;
-        }
-        
-        hidePlaybackControls();
-        
-        btnConnection.disabled = false;
-        btnGnss.disabled = false;
-        updateAllButtons();
-        
-        if (uwPort && uwPort.isOpen) {
-            uwPort.serial.onMessage = (line) => uwPort._onNMEAMessage(line);
-        }
-        if (gnssBridge) {
-            gnssBridge.onMessage = onGnssMessage;
-        }
-        
-        setStatus('Воспроизведение завершено');
-    }
+	function stopPlayback() {
+		isPlaying = false;
+		
+		// Останавливаем Logger и снимаем подписки
+		if (typeof Logger !== 'undefined') {
+			Logger.stopPlayback();
+			Logger.onEntry = null;
+			Logger.onPlaybackProgress = null;
+			Logger.onPlaybackEnd = null;
+		}
+		
+		hidePlaybackControls();
+		
+		if (btnConnection) btnConnection.disabled = false;
+		if (btnGnss) btnGnss.disabled = false;
+		updateAllButtons();
+		
+		// Восстанавливаем живые обработчики
+		if (uwPort && uwPort.isOpen && uwPort.serial) {
+			uwPort.serial.onMessage = (line) => uwPort._onNMEAMessage(line);
+		}
+		if (gnssBridge) {
+			gnssBridge.onMessage = onGnssMessage;
+		}
+		
+		setStatus('Воспроизведение остановлено');
+	}
 
     function showPlaybackControls() {
         const progress = document.getElementById('playback-progress');

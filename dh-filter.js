@@ -114,7 +114,10 @@ const DHTrackFilter = (() => {
 
             this._updateStatistics();
 
-            const lastPoint = primary[primary.length - 1];
+            // M04: C# использует sides[pSideIdx] после UpdateStatistics,
+            // поэтому перечитываем активную очередь — pSideIdx мог переключиться.
+            const activePrimary = this.sides[this.pSideIdx];
+            const lastPoint = activePrimary[activePrimary.length - 1];
             const testPoint = new GeoPoint3DTd(lat, lon, dpt, ts, lastPoint);
 
             const speedOk = testPoint.dist2Prev < testPoint.time2Prev * this._maxSpeedMps;

@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.5.6] - 2026-11-09
+
+### Исправлено
+- **Воспроизведение логов**:
+  - `parseLogLine` не понимал консольный формат `[HH:MM:SS][SOURCE]...` — теперь поддерживаются оба формата (консольный и нативный `HH:MM:SS.mmm: LEVEL: ...`)
+  - `parseTimestamp` падал на времени без миллисекунд (`10:40:25`) — теперь `.mmm` опциональны
+  - Строки `RCV >>` / `SND <<` не распознавались как `incoming`/`outgoing`, все попадали в `message` — regex расширен на `(?:RCV|SND)?\s*(>>|<<)`
+  - Воспроизведение «молчало»: `UWApp` использовал параллельный цикл (`playbackEntries`/`processNextPlaybackEntry`), не видевший поля `Logger` — переключено на нативный `Logger.startPlayback()` + подписки `onEntry`/`onProgress`/`onEnd`
+  - `processPlaybackEntry` выходил на `if (!entry.data)` для `message`-записей — теперь `data || formatted`, `try/catch` вокруг парсеров, фолбэк `[PLAY] ...` в консоль
+  - Кнопки скоростей (`−`/`+`) не влияли на `Logger` — теперь через `Logger.setPlaybackSpeed()`
+  - После конца воспроизведения кнопки `uWave`/`GNSS` оставались disabled — `onPlaybackEnd` восстанавливает порты и состояние
+- **Экспорт логов**:
+  - Экспорт консоли отдавал ровно 1000 строк (`UIConsole.settings.maxEntries = 1000`, буфер DOM) — `exportConsole` теперь берёт все записи из `Logger.exportLog()` (IndexedDB + память) с фолбэком на DOM
+  - `LogStorage.open()` не вызывался при старте — IndexedDB не открыт, `exportLog()` возвращал пусто. Теперь открывается в `init()` (fire-and-forget)
+- **Карта**:
+  - Клик по плашке маяка «писал 🎯, но не центрировал»: `followDevice`/`followAntenna` меняли `centerX/centerY`, но не сбрасывали `offsetX/offsetY` после pan. Теперь сбрасываются
+  - Двойной клик по карте давал жёсткий `scale = 100` (спорный «1 м / 100 px») — заменён на `fitAll()` (bbox по (0,0) + все устройства, авто-масштаб)
+- **Инициализация**:
+  - `updateAntennaInfo` падал с `TypeError: null.toFixed` (`isNaN(null) === false`), ломал `UWApp.init()` и все UI-модули после него. Добавлен `fmtNum(v, digits)` с проверкой `v == null` и `Number.isFinite`
+
+### Добавлено
+- `UIMap.fitAll()` — подбор масштаба и центра под все объекты (антенна + устройства + POI)
+- `UIMap.centerOnDevice(address, type)` — мгновенное центрирование без слежения
+- `app.js`: `initDeviceCardHandlers()` — двойной тап по карточке устройства (одиночный → `followDevice`, двойной → `centerOnDevice`); клик по `📌` не перехватывается
+- `app.js`: `fmtNum(v, digits)` — безопасное форматирование чисел (`null`/`undefined`/`NaN`/`Infinity` → `'--'`)
+- `app.js`: `LogStorage.open()` в `init()` — IndexedDB для записи и экспорта логов
+
+### Изменено
+- `Logger.parseLogLine` — единая точка парсинга двух форматов логов
+- `Logger.exportLog` — приоритет IndexedDB, фолбэк на память
+- `UIConsole.exportConsole` — `async`, в статусе источник (`Logger`/`DOM`) и число строк
+- `UIMap.followDevice` / `followAntenna` — сброс pan-offset, `autoScale = false`, `saveViewSettings()`
+- `UIMap` публичный API: `+fitAll`, `+centerOnDevice`
+- `UWApp.startPlayback` / `stopPlayback` — работают через API `Logger`, а не параллельный цикл
+- `app.js` — `initDeviceCardHandlers()` в `init()`, `fmtNum` рядом с `updateAntennaInfo`
+
+### Удалено
+- `app.js`: `playbackEntries`, `playbackIndex`, `playbackTimer`, `processNextPlaybackEntry()`, `updatePlaybackProgress()` — мёртвый код после перехода на `Logger.startPlayback()`
+
+### Известные ограничения
+- На `file://` CORS-предупреждения (`manifest.json`, `uw-vlbl-worker.js`) — PWA/Worker не работают из `file://`. Запускать через `http://localhost` (`python -m http.server`). На воспроизведение логов не влияет
+- `Logger.exportLog()` при непустом IndexedDB и непустом `entries` (записали сессию + импортировали лог) вернёт IndexedDB. Если нужно наоборот — `await LogStorage.clear()` перед импортом
+
+
 ## [0.5.1] - 2026-10-05
 
 ### Исправлено

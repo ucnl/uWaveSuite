@@ -298,26 +298,50 @@ const UIConsole = (() => {
         });
     }
 
-    function exportConsole() {
-        if (!contentEl) return;
-        
-        const text = Array.from(contentEl.children)
-            .filter(el => el.style.display !== 'none')
-            .map(el => el.textContent)
-            .join('\n');
-        
-        const blob = new Blob([text], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `uwave_console_${new Date().toISOString().slice(0, 10)}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        addSuccess('Консоль экспортирована');
-    }
+	async function exportConsole() {
+		let text = null;
+		let source = '';
+		let lineCount = 0;
+		
+		// ===== Приоритет 1: Logger (IndexedDB + память) — все записи =====
+		if (typeof Logger !== 'undefined' && typeof Logger.exportLog === 'function') {
+			try {
+				text = await Logger.exportLog();
+				source = 'Logger';
+			} catch (e) {
+				console.warn('[UIConsole] Logger.exportLog() failed:', e);
+				text = null;
+			}
+		}
+		
+		// ===== Приоритет 2: DOM (последние maxEntries) =====
+		if (!text && contentEl) {
+			text = Array.from(contentEl.children)
+				.filter(el => el.style.display !== 'none')
+				.map(el => el.textContent)
+				.join('\n');
+			source = 'DOM';
+		}
+		
+		if (!text || text.length === 0) {
+			addWarning('Нечего экспортировать');
+			return;
+		}
+		
+		lineCount = text.split('\n').length;
+		
+		const blob = new Blob([text], { type: 'text/plain' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `uwave_console_${new Date().toISOString().slice(0, 10)}.log`;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+		
+		addSuccess(`Экспортировано ${lineCount} строк (${source})`);
+	}
 
     // ========== СТАТИСТИКА ==========
     

@@ -97,7 +97,7 @@ const UIMap = (() => {
         });
         
         canvas.addEventListener('dblclick', () => {
-            resetView();
+            fitAll();
         });
         
         canvas.addEventListener('click', (e) => {
@@ -371,10 +371,21 @@ const UIMap = (() => {
         
         const device = deviceManager.getDevice(address, type);
         if (!device) return;
+		
+		// Fix
+		view.offsetX = 0;
+		view.offsetY = 0; 
+		// Fix
         
         if (!isNaN(device.xM) && !isNaN(device.yM)) {
             view.centerX = device.xM;
             view.centerY = device.yM;
+			
+			// Fix
+			view.autoScale = false;   
+			saveViewSettings();       
+			// Fix
+			
             view.followTarget = { type: 'device', address, deviceType: type };
             notifyListeners('followStarted', { type: 'device', address });
             return;
@@ -401,16 +412,62 @@ const UIMap = (() => {
     }
 
     function followAntenna() {
-        view.centerX = 0;
-        view.centerY = 0;
-        view.followTarget = { type: 'antenna' };
-        notifyListeners('followStarted', { type: 'antenna' });
+        view.offsetX = 0;
+		view.offsetY = 0;
+		view.centerX = 0;
+		view.centerY = 0;
+		view.autoScale = false;
+		saveViewSettings();
+		view.followTarget = { type: 'antenna' };
+		notifyListeners('followStarted', { type: 'antenna' });
     }
 
     function clearFollow() {
         view.followTarget = null;
         notifyListeners('followCleared');
     }
+
+	function fitAll() {
+		view.offsetX = 0;
+		view.offsetY = 0;
+		view.followTarget = null;
+		autoScale();
+		notifyListeners('viewReset');
+	}
+
+	function centerOnDevice(address, type = 'cdma') {
+		const deviceManager = getDeviceManager();
+		if (!deviceManager) return false;
+		const device = deviceManager.getDevice(address, type);
+		if (!device) return false;
+		
+		view.offsetX = 0;
+		view.offsetY = 0;
+		view.followTarget = null;
+		
+		if (!isNaN(device.xM) && !isNaN(device.yM)) {
+			view.centerX = device.xM;
+			view.centerY = device.yM;
+		} else {
+			const st = typeof UWUSBLsolver !== 'undefined' ? UWUSBLsolver.getState() : null;
+			if (st && !isNaN(st.antennaLatDeg) && !isNaN(st.antennaLonDeg)
+				&& !isNaN(device.latitudeDeg) && !isNaN(device.longitudeDeg)) {
+				const deltas = GeoUtils.deltasByDegrees(
+					st.antennaLatDeg, st.antennaLonDeg,
+					device.latitudeDeg, device.longitudeDeg
+				);
+				view.centerX = deltas.deltaLonM;
+				view.centerY = deltas.deltaLatM;
+			} else {
+				return false;
+			}
+		}
+		view.autoScale = false;
+		saveViewSettings();
+		return true;
+	}
+
+
 
     // ========== КОНВЕРТАЦИЯ КООРДИНАТ ==========
     
@@ -950,7 +1007,9 @@ const UIMap = (() => {
         screenToWorld,
         draw,
         getView: () => view,
-        subscribe
+        subscribe,
+		fitAll,
+		centerOnDevice
     };
 
 })();

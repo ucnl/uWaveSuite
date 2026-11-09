@@ -27,9 +27,9 @@
 		<button id="btn-settings" class="top-btn btn-settings">⚙ Настройки</button>
 		
 		<!-- Выпадающая кнопка Инструменты -->
-		<div class="dropdown" style="display:inline-block; position:relative;">
+		<div class="dropdown">
 			<button class="top-btn btn-tools" onclick="UWApp.toggleDropdown('tools-dropdown')">🔧 Инструменты ▾</button>
-			<div id="tools-dropdown" class="dropdown-menu" style="display:none; position:absolute; top:100%; right:0; z-index:300; min-width:200px;">
+			<div id="tools-dropdown" class="dropdown-menu">
 				<div class="dropdown-item" onclick="UWApp.openTrackingPanel(); UWApp.closeAllDropdowns();">🎯 Настройка трекинга</div>
 				<div class="dropdown-item" onclick="UWApp.openDevicesPanel(); UWApp.closeAllDropdowns();">📡 Устройства</div>
 				<div class="dropdown-item" onclick="UWApp.toggleTopoPanel(); UWApp.closeAllDropdowns();">🌐 Топопривязка</div>
@@ -43,9 +43,9 @@
 		<button class="top-btn btn-export" onclick="UWApp.openExportPanel()">📤 Экспорт</button>
 		
 		<!-- Выпадающая кнопка POI -->
-		<div class="dropdown" style="display:inline-block; position:relative;">
+		<div class="dropdown">
 			<button class="top-btn btn-export" onclick="UWApp.toggleDropdown('poi-dropdown')">📍 POI ▾</button>
-			<div id="poi-dropdown" class="dropdown-menu" style="display:none; position:absolute; top:100%; right:0; z-index:300; min-width:180px;">
+			<div id="poi-dropdown" class="dropdown-menu">
 				<div class="dropdown-item" onclick="UWApp.loadPOI(); UWApp.closeAllDropdowns();">📂 Загрузить из CSV</div>
 				<div class="dropdown-item" onclick="UWApp.exportPOI_CSV(); UWApp.closeAllDropdowns();">💾 Сохранить в CSV</div>
 				<div class="dropdown-item" onclick="UWApp.clearPOI(); UWApp.closeAllDropdowns();">🗑 Очистить все</div>
@@ -57,9 +57,9 @@
 		</button>
 		
 		<!-- Выпадающая кнопка Лог -->
-		<div class="dropdown" style="display:inline-block; position:relative;">
+		<div class="dropdown">
 			<button class="top-btn btn-log" onclick="UWApp.toggleDropdown('log-dropdown')">📋 Лог ▾</button>
-			<div id="log-dropdown" class="dropdown-menu" style="display:none; position:absolute; top:100%; right:0; z-index:300; min-width:170px;">
+			<div id="log-dropdown" class="dropdown-menu">
 				<div class="dropdown-item" onclick="UWApp.saveLog(); UWApp.closeAllDropdowns();">💾 Сохранить</div>
 				<div class="dropdown-item" onclick="UWApp.loadLog(); UWApp.closeAllDropdowns();">📂 Открыть</div>
 				<div id="log-play-item" class="dropdown-item" onclick="UWApp.togglePlayback(); UWApp.closeAllDropdowns();">▶ Воспроизвести</div>

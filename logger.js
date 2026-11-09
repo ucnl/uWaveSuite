@@ -40,16 +40,16 @@ const Logger = (() => {
         return `${h}:${m}:${s}.${ms}`;
     }
 
-    function parseTimestamp(str) {
-        const parts = str.split(':');
-        if (parts.length !== 3) return NaN;
-        const h = parseInt(parts[0]);
-        const m = parseInt(parts[1]);
-        const secMs = parts[2].split('.');
-        const s = parseInt(secMs[0]);
-        const ms = secMs[1] ? parseInt(secMs[1].padEnd(3, '0')) : 0;
-        return h * 3600 + m * 60 + s + ms / 1000;
-    }
+	function parseTimestamp(str) {
+		// Поддержка HH:MM:SS и HH:MM:SS.mmm
+		const m = str.match(/^(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?$/);
+		if (!m) return NaN;
+		const h = parseInt(m[1], 10);
+		const min = parseInt(m[2], 10);
+		const s = parseInt(m[3], 10);
+		const ms = m[4] ? parseInt(m[4].padEnd(3, '0'), 10) : 0;
+		return h * 3600 + min * 60 + s + ms / 1000;
+	}
 
     // ========== ПОИСК ПЕРВОЙ ТОЧКИ МАЯКА ==========
     
@@ -200,42 +200,83 @@ const Logger = (() => {
 
     // ========== ИМПОРТ ==========
 
-    function parseLogLine(line) {
-        const idx = line.indexOf(': ');
-        if (idx < 0) return null;
+	function parseLogLine(line) {
+		if (!line) return null;
 
-        const timeStr = line.substring(0, idx);
-        const rest = line.substring(idx + 2);
-        const ts = parseTimestamp(timeStr);
-        if (isNaN(ts)) return null;
+		// ===== Формат 1: console format [HH:MM:SS][SOURCE]data =====
+		// Пример: [10:40:25][PORT]RCV >> $PUWV0,2,0*36
+		//         [10:40:25][DEVICE]Таймаут устройства #Tx0/Rx0
+		const consoleMatch = line.match(/^\[(\d{1,2}:\d{2}:\d{2}(?:\.\d{1,3})?)\]\[([^\]]+)\](.*)$/);
+		if (consoleMatch) {
+			const ts = parseTimestamp(consoleMatch[1]);
+			if (isNaN(ts)) return null;
 
-        const levelMatch = rest.match(/^(\w+):\s*(.*)$/);
-        if (!levelMatch) return null;
+			const source = consoleMatch[2];      // PORT / DEVICE / TRACK / RC / QUEUE
+			const content = consoleMatch[3];     // "RCV >> ..." или "Таймаут..."
 
-        const level = levelMatch[1];
-        const content = levelMatch[2];
+			// Направление может быть в виде "RCV >>", "SND <<" или просто ">>", "<<"
+			const dirMatch = content.match(/^(?:RCV|SND)?\s*(>>|<<)\s*(.+)$/);
+			if (dirMatch) {
+				return {
+					type: dirMatch[1] === '>>' ? 'incoming' : 'outgoing',
+					level: 'INFO',
+					port: source,
+					direction: dirMatch[1],
+					data: dirMatch[2].trim(),
+					timestamp: ts,
+					formatted: line,
+				};
+			}
 
-        const portMatch = content.match(/^(.+?)\s*(>>|<<)\s*(.+)$/);
-        if (portMatch) {
-            return {
-                type: portMatch[2] === '>>' ? 'incoming' : 'outgoing',
-                level,
-                port: portMatch[1],
-                direction: portMatch[2],
-                data: portMatch[3],
-                timestamp: ts,
-                formatted: line,
-            };
-        }
+			// Без направления — обычное сообщение (DEVICE, TRACK и т.п.)
+			return {
+				type: 'message',
+				level: 'INFO',
+				port: source,
+				message: content,
+				timestamp: ts,
+				formatted: line,
+			};
+		}
 
-        return {
-            type: 'message',
-            level,
-            message: content,
-            timestamp: ts,
-            formatted: line,
-        };
-    }
+		// ===== Формат 2: native logger format =====
+		// Пример: 10:40:25.123: INFO: PORT >> $PUWV0,2,0*36
+		//         10:40:25.123: WARNING: Таймаут устройства
+		const idx = line.indexOf(': ');
+		if (idx < 0) return null;
+
+		const timeStr = line.substring(0, idx);
+		const rest = line.substring(idx + 2);
+		const ts = parseTimestamp(timeStr);
+		if (isNaN(ts)) return null;
+
+		const levelMatch = rest.match(/^(\w+):\s*(.*)$/);
+		if (!levelMatch) return null;
+
+		const level = levelMatch[1];
+		const content = levelMatch[2];
+
+		const portMatch = content.match(/^(.+?)\s*(>>|<<)\s*(.+)$/);
+		if (portMatch) {
+			return {
+				type: portMatch[2] === '>>' ? 'incoming' : 'outgoing',
+				level,
+				port: portMatch[1],
+				direction: portMatch[2],
+				data: portMatch[3],
+				timestamp: ts,
+				formatted: line,
+			};
+		}
+
+		return {
+			type: 'message',
+			level,
+			message: content,
+			timestamp: ts,
+			formatted: line,
+		};
+	}
 
     function importLog(text) {
         stopPlayback();

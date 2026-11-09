@@ -1,4 +1,4 @@
-const CACHE = 'uwave-v20';
+const CACHE = 'uwave-v21';
 
 const ASSETS = [
 	'./',

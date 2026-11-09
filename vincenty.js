@@ -92,12 +92,16 @@ const Vincenty = (() => {
             )
         );
 
-        const ep_lon = lonRad + L;
+		let ep_lon = lonRad + L;
+		// Нормализация в [-π, π), чтобы западная долгота не превращалась в восточную.
+		// Раньше wrap2PI давал [0, 2π), что в градусах = [0, 360).
+        ep_lon = ep_lon - 2 * Math.PI * Math.floor((ep_lon + Math.PI) / (2 * Math.PI));
+
         const rev_azm = Math.atan2(sin_alpha, -x);
 
         return {
             lat: ep_lat,
-            lon: wrap2PI(ep_lon),
+            lon: ep_lon,
             revAzm: wrap2PI(rev_azm),
             converged: converged,
             iterations: iterations,

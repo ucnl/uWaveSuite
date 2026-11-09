@@ -540,12 +540,45 @@ body {
 .btn-settings:hover:not(:disabled) { background: var(--btn-settings-hover); }
 
 /* ========== ВЫПАДАЮЩИЕ МЕНЮ ========== */
+.dropdown {
+    display: inline-block;
+    position: relative;
+}
+
 .dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 300;
+    min-width: 170px;
     background: var(--bg-secondary);
     border: 1px solid var(--border-primary);
     border-radius: var(--radius-sm);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     overflow: hidden;
+}
+
+.dropdown-menu.visible {
+    display: block;
+}
+
+/* Мобильные: bottom sheet */
+@media (max-width: 768px) {
+    .dropdown-menu {
+        position: fixed;
+        top: auto !important;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        min-width: 0;
+        max-width: 100vw;
+        border-radius: 12px 12px 0 0;
+        max-height: 60vh;
+        overflow-y: auto;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+        box-sizing: border-box;
+    }
 }
 
 .dropdown-item {

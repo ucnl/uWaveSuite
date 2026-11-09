@@ -11,18 +11,19 @@ const DHTrackFilterXYZ = (() => {
          * @param {Date} ts - временная метка
          * @param {Point3DTd|null} prevPoint - предыдущая точка для расчёта дистанции
          */
-        constructor(x, y, z, ts, prevPoint = null) {
+		constructor(x, y, z, ts, prevPoint = null) {
             this.x = x;
             this.y = y;
             this.z = z;
             this.ts = ts;
 
             if (prevPoint) {
+                // M04-bis: C# DHTrackFilterCartesian учитывает только X и Y,
+                // игнорируя Z при расчёте расстояния между точками.
                 const dx = x - prevPoint.x;
                 const dy = y - prevPoint.y;
-                const dz = z - prevPoint.z;
-                this.dist2Prev = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                this.time2Prev = (ts - prevPoint.ts) / 1000; // в секундах
+                this.dist2Prev = Math.sqrt(dx * dx + dy * dy);
+                this.time2Prev = (ts - prevPoint.ts) / 1000;
             } else {
                 this.dist2Prev = NaN;
                 this.time2Prev = NaN;
@@ -131,7 +132,6 @@ const DHTrackFilterXYZ = (() => {
         process(x, y, z, ts) {
             const primary = this.sides[this.pSideIdx];
 
-            // Первая точка — всегда принимается
             if (primary.length === 0) {
                 const point = new Point3DTd(x, y, z, ts);
                 this._addPoint(this.pSideIdx, point);
@@ -140,7 +140,9 @@ const DHTrackFilterXYZ = (() => {
 
             this._updateStatistics();
 
-            const lastPoint = primary[primary.length - 1];
+            // M04: перечитываем активную очередь после возможного переключения
+            const activePrimary = this.sides[this.pSideIdx];
+            const lastPoint = activePrimary[activePrimary.length - 1];
             const testPoint = new Point3DTd(x, y, z, ts, lastPoint);
 
             // Критерии принятия:

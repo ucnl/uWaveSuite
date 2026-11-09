@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Конвертер координат: Geo ↔ XYZ</title>
-    <link rel="manifest" href="data:application/manifest+json,{"name":"Geo%20%E2%86%94%20XYZ%20Converter","short_name":"GeoXYZ","start_url":".","display":"standalone","background_color":"%231a1a2e","theme_color":"%23e83e8c"}">
+    <title data-i18n="tools.coord.title">Конвертер координат: Geo ↔ XYZ</title>
     <meta name="theme-color" content="#e83e8c">
     <style>
         :root {
@@ -129,11 +128,15 @@
             width: 20px; height: 20px; border-radius: 50%;
             background: var(--border-accent); cursor: pointer; border: 2px solid #fff;
         }
-    </style>
+    .language-control { display:flex; justify-content:flex-end; margin: 0 0 12px; }
+.language-control select { max-width:140px; min-height:34px; padding:6px; color:var(--text-primary); background:var(--bg-input); border:1px solid var(--border-primary); border-radius:var(--radius-sm); font:inherit; }
+.language-control select:focus-visible { outline:2px solid var(--border-accent); }
+</style>
 </head>
 <body>
     <div class="container">
-        <h1>🔄 Конвертер координат</h1>
+        <h1 data-i18n="tools.coord.heading">🔄 Конвертер координат</h1>
+<div class="language-control"><select data-language-selector data-i18n-aria-label="main.language" data-i18n-title="main.language" aria-label="Язык" title="Язык"></select></div>
 
         <div class="mode-tabs">
             <button class="mode-tab active" data-mode="geo2xyz" onclick="switchMode('geo2xyz')">🌍 Geo → 📐 XYZ</button>
@@ -142,87 +145,87 @@
 
         <!-- ============ Geo → XYZ ============ -->
         <div id="modeGeo2Xyz">
-            <p class="subtitle">Загрузите KML или CSV с географическими координатами. Утилита пересчитает их в метры (X, Y, Z) относительно опорной точки.</p>
+            <p class="subtitle" data-i18n="tools.coord.geoDescription">Загрузите KML или CSV с географическими координатами. Утилита пересчитает их в метры (X, Y, Z) относительно опорной точки.</p>
             <div class="step-card">
-                <h3>📥 Шаг 1. Загрузите данные</h3>
+                <h3 data-i18n="tools.coord.loadStep">📥 Шаг 1. Загрузите данные</h3>
                 <div class="file-upload-area" onclick="document.getElementById('geoFileInput').click()">
                     <span class="upload-icon">📁</span>
-                    <span class="upload-text">Нажмите для выбора KML или CSV-файла</span>
+                    <span class="upload-text" data-i18n="tools.coord.chooseGeoFile">Нажмите для выбора KML или CSV-файла</span>
                     <span class="file-name" id="geoFileName"></span>
                     <input type="file" id="geoFileInput" accept=".kml,.xml,.csv,.txt" onchange="handleGeoFile(event)">
                 </div>
-                <textarea id="geoInput" placeholder="Или вставьте содержимое KML / CSV сюда..."></textarea>
+                <textarea id="geoInput" placeholder="Или вставьте содержимое KML / CSV сюда..." data-i18n-placeholder="tools.coord.geoPlaceholder"></textarea>
             </div>
             <div class="step-card">
-                <h3>🎯 Шаг 2. Укажите столбцы (для CSV)</h3>
+                <h3 data-i18n="tools.coord.csvColumnsStep">🎯 Шаг 2. Укажите столбцы (для CSV)</h3>
                 <div class="columns-row">
-                    <div class="col-group"><label for="geoLatCol">🟢 Широта (Lat)</label><select id="geoLatCol"></select></div>
-                    <div class="col-group"><label for="geoLonCol">🔵 Долгота (Lon)</label><select id="geoLonCol"></select></div>
-                    <div class="col-group"><label for="geoDepthCol">🟣 Глубина (Z)</label><select id="geoDepthCol"><option value="-1">— Не использовать —</option></select></div>
+                    <div class="col-group"><label for="geoLatCol" data-i18n="tools.coord.latColumn">🟢 Широта (Lat)</label><select id="geoLatCol"></select></div>
+                    <div class="col-group"><label for="geoLonCol" data-i18n="tools.coord.lonColumn">🔵 Долгота (Lon)</label><select id="geoLonCol"></select></div>
+                    <div class="col-group"><label for="geoDepthCol" data-i18n="tools.coord.depthColumn">🟣 Глубина (Z)</label><select id="geoDepthCol"><option value="-1" data-i18n="tools.coord.unused">— Не использовать —</option></select></div>
                 </div>
             </div>
             <div class="step-card">
-                <h3>📍 Шаг 3. Опорная точка (начало координат)</h3>
+                <h3 data-i18n="tools.coord.referenceStep">📍 Шаг 3. Опорная точка (начало координат)</h3>
                 <div class="ref-point-row">
                     <div class="ref-group">
-                        <label>Широта (Lat₀)</label>
-                        <input type="text" id="geoRefLat" placeholder="Авто (центроида)">
+                        <label data-i18n="tools.coord.refLatitude">Широта (Lat₀)</label>
+                        <input type="text" id="geoRefLat" placeholder="Авто (центроида)" data-i18n-placeholder="tools.coord.autoCentroid">
                         <div class="ref-auto" id="geoCentroidInfo"></div>
                     </div>
                     <div class="ref-group">
-                        <label>Долгота (Lon₀)</label>
-                        <input type="text" id="geoRefLon" placeholder="Авто (центроида)">
+                        <label data-i18n="tools.coord.refLongitude">Долгота (Lon₀)</label>
+                        <input type="text" id="geoRefLon" placeholder="Авто (центроида)" data-i18n-placeholder="tools.coord.autoCentroid">
                     </div>
                 </div>
             </div>
             <div class="preview-section">
-                <h3>👁️ Предпросмотр</h3>
+                <h3 data-i18n="tools.preview">👁️ Предпросмотр</h3>
                 <div class="preview-table-wrapper">
                     <table class="preview-table" id="geoPreviewTable">
-                        <thead><tr><th>#</th><th>Name</th><th>Lat</th><th>Lon</th><th>Depth</th><th>X (E), м</th><th>Y (N), м</th><th>Z, м</th></tr></thead>
-                        <tbody id="geoPreviewBody"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">Загрузите данные</td></tr></tbody>
+                        <thead><tr><th>#</th><th>Name</th><th>Lat</th><th>Lon</th><th>Depth</th><th data-i18n="tools.coord.eastMeters">X (E), м</th><th data-i18n="tools.coord.northMeters">Y (N), м</th><th data-i18n="tools.coord.depthMeters">Z, м</th></tr></thead>
+                        <tbody id="geoPreviewBody"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;" data-i18n="tools.coord.loadData">Загрузите данные</td></tr></tbody>
                     </table>
                 </div>
             </div>
             <div class="btn-row">
-                <button class="btn-primary" onclick="convertGeoToXyz()">🔄 Конвертировать</button>
-                <button class="btn-success" onclick="downloadOutput()" id="btnDownloadGeo2Xyz" disabled>💾 Скачать CSV</button>
-                <button class="btn-copy" onclick="copyToClipboard()" id="btnCopyGeo2Xyz" disabled>📋 Копировать</button>
+                <button class="btn-primary" onclick="convertGeoToXyz()" data-i18n="tools.coord.convert">🔄 Конвертировать</button>
+                <button class="btn-success" onclick="downloadOutput()" id="btnDownloadGeo2Xyz" disabled data-i18n="tools.downloadCSV">💾 Скачать CSV</button>
+                <button class="btn-copy" onclick="copyToClipboard()" id="btnCopyGeo2Xyz" disabled data-i18n="tools.copy">📋 Копировать</button>
             </div>
         </div>
 
         <!-- ============ XYZ → Geo ============ -->
         <div id="modeXyz2Geo" class="hidden">
-            <p class="subtitle">Загрузите CSV с координатами X, Y, Z в метрах. Укажите точку привязки и подберите направление антенны (Heading) по треку на мини-карте.</p>
+            <p class="subtitle" data-i18n="tools.coord.xyzDescription">Загрузите CSV с координатами X, Y, Z в метрах. Укажите точку привязки и подберите направление антенны (Heading) по треку на мини-карте.</p>
             <div class="step-card">
-                <h3>📥 Шаг 1. Загрузите CSV с XYZ</h3>
+                <h3 data-i18n="tools.coord.xyzLoadStep">📥 Шаг 1. Загрузите CSV с XYZ</h3>
                 <div class="file-upload-area" onclick="document.getElementById('xyzFileInput').click()">
                     <span class="upload-icon">📁</span>
-                    <span class="upload-text">Нажмите для выбора CSV-файла</span>
+                    <span class="upload-text" data-i18n="tools.coord.chooseXyzFile">Нажмите для выбора CSV-файла</span>
                     <span class="file-name" id="xyzFileName"></span>
                     <input type="file" id="xyzFileInput" accept=".csv,.txt" onchange="handleXyzFile(event)">
                 </div>
-                <textarea id="xyzInput" placeholder="Или вставьте CSV с колонками X,Y,Z..."></textarea>
+                <textarea id="xyzInput" placeholder="Или вставьте CSV с колонками X,Y,Z..." data-i18n-placeholder="tools.coord.xyzPlaceholder"></textarea>
             </div>
             <div class="step-card">
-                <h3>🎯 Шаг 2. Укажите столбцы</h3>
+                <h3 data-i18n="tools.coord.columnsStep">🎯 Шаг 2. Укажите столбцы</h3>
                 <div class="columns-row">
-                    <div class="col-group"><label for="xyzXCol">🟢 X (East), м</label><select id="xyzXCol"></select></div>
-                    <div class="col-group"><label for="xyzYCol">🔵 Y (North), м</label><select id="xyzYCol"></select></div>
-                    <div class="col-group"><label for="xyzZCol">🟣 Z (Depth), м</label><select id="xyzZCol"><option value="-1">— Не использовать —</option></select></div>
+                    <div class="col-group"><label for="xyzXCol" data-i18n="tools.coord.xColumn">🟢 X (East), м</label><select id="xyzXCol"></select></div>
+                    <div class="col-group"><label for="xyzYCol" data-i18n="tools.coord.yColumn">🔵 Y (North), м</label><select id="xyzYCol"></select></div>
+                    <div class="col-group"><label for="xyzZCol" data-i18n="tools.coord.zColumn">🟣 Z (Depth), м</label><select id="xyzZCol"><option value="-1" data-i18n="tools.coord.unused">— Не использовать —</option></select></div>
                 </div>
             </div>
             <div class="step-card">
-                <h3>📍 Шаг 3. Топопривязка</h3>
+                <h3 data-i18n="tools.coord.topoStep">📍 Шаг 3. Топопривязка</h3>
                 <div class="ref-point-row">
-                    <div class="ref-group"><label>Широта антенны</label><input type="text" id="xyzRefLat" placeholder="55.123456"></div>
-                    <div class="ref-group"><label>Долгота антенны</label><input type="text" id="xyzRefLon" placeholder="37.654321"></div>
+                    <div class="ref-group"><label data-i18n="tools.coord.antennaLatitude">Широта антенны</label><input type="text" id="xyzRefLat" placeholder="55.123456"></div>
+                    <div class="ref-group"><label data-i18n="tools.coord.antennaLongitude">Долгота антенны</label><input type="text" id="xyzRefLon" placeholder="37.654321"></div>
                     <div class="ref-group"><label>Heading (°)</label><input type="text" id="xyzHeading" placeholder="0" value="0"></div>
                 </div>
-                <div style="font-size:0.75em;color:var(--text-muted);">Heading: 0° = север, 90° = восток, по часовой стрелке</div>
+                <div style="font-size:0.75em;color:var(--text-muted);" data-i18n="tools.coord.headingHint">Heading: 0° = север, 90° = восток, по часовой стрелке</div>
             </div>
             <div class="step-card">
-                <h3>🗺️ Шаг 4. Подберите Heading по треку</h3>
+                <h3 data-i18n="tools.coord.headingStep">🗺️ Шаг 4. Подберите Heading по треку</h3>
                 <div style="display:flex; gap:15px; align-items:center; margin-bottom:10px;">
                     <span style="font-size:0.85em;">Heading:</span>
                     <input type="range" id="xyzHeadingSlider" min="0" max="360" value="0" step="1" 
@@ -230,24 +233,24 @@
                     <span id="xyzHeadingValue" style="font-weight:600;min-width:45px;">0°</span>
                 </div>
                 <canvas id="xyzPreviewCanvas" width="600" height="400"></canvas>
-                <div style="font-size:0.75em;color:var(--text-muted);margin-top:5px;">
-                    🔴 Опорная точка &nbsp; 🟢 Трек &nbsp; 🟡 Первая точка &nbsp; 📐 N↑ E→
+                <div style="font-size:0.75em;color:var(--text-muted);margin-top:5px;" data-i18n="tools.coord.legend">
+                    🔴 Опорная точка   🟢 Трек   🟡 Первая точка   📐 N↑ E→
                 </div>
             </div>
             <div class="preview-section">
-                <h3>👁️ Предпросмотр таблицы (первые 20 точек)</h3>
+                <h3 data-i18n="tools.coord.tablePreview">👁️ Предпросмотр таблицы (первые 20 точек)</h3>
                 <div class="preview-table-wrapper">
                     <table class="preview-table" id="xyzPreviewTable">
-                        <thead><tr><th>#</th><th>X, м</th><th>Y, м</th><th>Z, м</th><th>Lat</th><th>Lon</th><th>Depth</th></tr></thead>
-                        <tbody id="xyzPreviewBody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">Загрузите данные</td></tr></tbody>
+                        <thead><tr><th>#</th><th data-i18n="tools.coord.xMeters">X, м</th><th data-i18n="tools.coord.yMeters">Y, м</th><th data-i18n="tools.coord.depthMeters">Z, м</th><th>Lat</th><th>Lon</th><th>Depth</th></tr></thead>
+                        <tbody id="xyzPreviewBody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;" data-i18n="tools.coord.loadData">Загрузите данные</td></tr></tbody>
                     </table>
                 </div>
             </div>
             <div class="btn-row">
-                <button class="btn-primary" onclick="convertXyzToGeo()">🔄 Конвертировать (Vincenty)</button>
-                <button class="btn-success" onclick="downloadOutput()" id="btnDownloadXyz2Geo" disabled>💾 Скачать CSV</button>
-                <button class="btn-success" onclick="downloadKml()" id="btnDownloadKml" disabled>💾 Скачать KML</button>
-                <button class="btn-copy" onclick="copyToClipboard()" id="btnCopyXyz2Geo" disabled>📋 Копировать</button>
+                <button class="btn-primary" onclick="convertXyzToGeo()" data-i18n="tools.coord.convertVincenty">🔄 Конвертировать (Vincenty)</button>
+                <button class="btn-success" onclick="downloadOutput()" id="btnDownloadXyz2Geo" disabled data-i18n="tools.downloadCSV">💾 Скачать CSV</button>
+                <button class="btn-success" onclick="downloadKml()" id="btnDownloadKml" disabled data-i18n="tools.downloadKML">💾 Скачать KML</button>
+                <button class="btn-copy" onclick="copyToClipboard()" id="btnCopyXyz2Geo" disabled data-i18n="tools.copy">📋 Копировать</button>
             </div>
         </div>
 
@@ -255,7 +258,249 @@
         <textarea id="outputData" style="display:none;"></textarea>
     </div>
 
-    <script>
+    <script data-localization>
+// Add a language in the header and its value in each matching column below. Missing values use English.
+(function (window, document) {
+    'use strict';
+    const storageKey = 'azimuth_coord_language';
+    const languages = [['ru', 'Русский'], ['en', 'English']];
+    const messages = {
+        "main.language": ["Язык", "Language"],
+        "tools.coord.antennaLatitude": ["Широта антенны", "Antenna latitude"],
+        "tools.coord.antennaLongitude": ["Долгота антенны", "Antenna longitude"],
+        "tools.coord.autoCentroid": ["Авто (центроида)", "Auto (centroid)"],
+        "tools.coord.centroid": ["Центроида: {lat}, {lon}", "Centroid: {lat}, {lon}"],
+        "tools.coord.centroidOverride": ["Центроида: {lat}, {lon} (переопределено)", "Centroid: {lat}, {lon} (overridden)"],
+        "tools.coord.chooseGeoFile": ["Нажмите для выбора KML или CSV-файла", "Click to choose a KML or CSV file"],
+        "tools.coord.chooseXyzFile": ["Нажмите для выбора CSV-файла", "Click to choose a CSV file"],
+        "tools.coord.columnsStep": ["🎯 Шаг 2. Укажите столбцы", "🎯 Step 2. Select columns"],
+        "tools.coord.convert": ["🔄 Конвертировать", "🔄 Convert"],
+        "tools.coord.convertVincenty": ["🔄 Конвертировать (Vincenty)", "🔄 Convert (Vincenty)"],
+        "tools.coord.convertedGeo": ["✅ Сконвертировано {count} точек. Ref: {lat}, {lon}", "✅ Converted {count} points. Ref: {lat}, {lon}"],
+        "tools.coord.convertedXyz": ["✅ Сконвертировано {count} точек (Vincenty). Ref: {lat}, {lon}, Hdg: {heading}°", "✅ Converted {count} points (Vincenty). Ref: {lat}, {lon}, Hdg: {heading}°"],
+        "tools.coord.csvColumnsStep": ["🎯 Шаг 2. Укажите столбцы (для CSV)", "🎯 Step 2. Select columns (for CSV)"],
+        "tools.coord.depthColumn": ["🟣 Глубина (Z)", "🟣 Depth (Z)"],
+        "tools.coord.depthMeters": ["Z, м", "Z, m"],
+        "tools.coord.eastMeters": ["X (E), м", "X (E), m"],
+        "tools.coord.enterReference": ["Введите точку привязки", "Enter a reference point"],
+        "tools.coord.geoDescription": ["Загрузите KML или CSV с географическими координатами. Утилита пересчитает их в метры (X, Y, Z) относительно опорной точки.", "Load KML or CSV with geographic coordinates. The tool converts them to meters (X, Y, Z) relative to a reference point."],
+        "tools.coord.geoPlaceholder": ["Или вставьте содержимое KML / CSV сюда...", "Or paste KML / CSV content here..."],
+        "tools.coord.heading": ["🔄 Конвертер координат", "🔄 Coordinate converter"],
+        "tools.coord.headingHint": ["Heading: 0° = север, 90° = восток, по часовой стрелке", "Heading: 0° = north, 90° = east, clockwise"],
+        "tools.coord.headingStep": ["🗺️ Шаг 4. Подберите Heading по треку", "🗺️ Step 4. Adjust Heading using the track"],
+        "tools.coord.latColumn": ["🟢 Широта (Lat)", "🟢 Latitude (Lat)"],
+        "tools.coord.legend": ["🔴 Опорная точка   🟢 Трек   🟡 Первая точка   📐 N↑ E→", "🔴 Reference point   🟢 Track   🟡 First point   📐 N↑ E→"],
+        "tools.coord.loadData": ["Загрузите данные", "Load data"],
+        "tools.coord.loadStep": ["📥 Шаг 1. Загрузите данные", "📥 Step 1. Load data"],
+        "tools.coord.lonColumn": ["🔵 Долгота (Lon)", "🔵 Longitude (Lon)"],
+        "tools.coord.noCoordinates": ["Нет координат", "No coordinates"],
+        "tools.coord.noData": ["Нет данных", "No data"],
+        "tools.coord.northMeters": ["Y (N), м", "Y (N), m"],
+        "tools.coord.refLatitude": ["Широта (Lat₀)", "Latitude (Lat₀)"],
+        "tools.coord.refLongitude": ["Долгота (Lon₀)", "Longitude (Lon₀)"],
+        "tools.coord.referenceStep": ["📍 Шаг 3. Опорная точка (начало координат)", "📍 Step 3. Reference point (origin)"],
+        "tools.coord.selectColumns": ["Выберите столбцы", "Select columns"],
+        "tools.coord.tablePreview": ["👁️ Предпросмотр таблицы (первые 20 точек)", "👁️ Table preview (first 20 points)"],
+        "tools.coord.title": ["Конвертер координат: Geo ↔ XYZ", "Coordinate converter: Geo ↔ XYZ"],
+        "tools.coord.topoStep": ["📍 Шаг 3. Топопривязка", "📍 Step 3. Positioning"],
+        "tools.coord.unused": ["— Не использовать —", "— Do not use —"],
+        "tools.coord.xColumn": ["🟢 X (East), м", "🟢 X (East), m"],
+        "tools.coord.xMeters": ["X, м", "X, m"],
+        "tools.coord.xyzDescription": ["Загрузите CSV с координатами X, Y, Z в метрах. Укажите точку привязки и подберите направление антенны (Heading) по треку на мини-карте.", "Load CSV with X, Y, Z coordinates in meters. Enter a reference point and adjust the antenna heading using the track on the mini-map."],
+        "tools.coord.xyzLoadStep": ["📥 Шаг 1. Загрузите CSV с XYZ", "📥 Step 1. Load CSV with XYZ"],
+        "tools.coord.xyzPlaceholder": ["Или вставьте CSV с колонками X,Y,Z...", "Or paste CSV with X,Y,Z columns..."],
+        "tools.coord.yColumn": ["🔵 Y (North), м", "🔵 Y (North), m"],
+        "tools.coord.yMeters": ["Y, м", "Y, m"],
+        "tools.coord.zColumn": ["🟣 Z (Depth), м", "🟣 Z (Depth), m"],
+        "tools.copied": ["📋 Скопировано", "📋 Copied"],
+        "tools.copy": ["📋 Копировать", "📋 Copy"],
+        "tools.downloadCSV": ["💾 Скачать CSV", "💾 Download CSV"],
+        "tools.downloadKML": ["💾 Скачать KML", "💾 Download KML"],
+        "tools.error.coordinateColumns": ["❌ Выберите столбцы координат", "❌ Select coordinate columns"],
+        "tools.error.enterReference": ["❌ Введите точку привязки", "❌ Enter a reference point"],
+        "tools.error.generic": ["❌ Ошибка", "❌ Error"],
+        "tools.error.noData": ["❌ Нет данных", "❌ No data"],
+        "tools.error.reference": ["❌ Не удалось определить опорную точку", "❌ Could not determine a reference point"],
+        "tools.error.xyColumns": ["❌ Выберите столбцы X и Y", "❌ Select X and Y columns"],
+        "tools.map.kilometers": ["{value} км", "{value} km"],
+        "tools.map.meters": ["{value} м", "{value} m"],
+        "tools.preview": ["👁️ Предпросмотр", "👁️ Preview"]
+    };
+
+    const columns = new Map(languages.map(([code, name], index) => [code.toLowerCase(), { name, index }]));
+    const bindings = new WeakMap(), selectors = new WeakSet();
+    const attributes = ['title', 'placeholder', 'aria-label'];
+    const query = ['data-i18n', 'data-i18n-bound-text', 'data-language-selector', ...attributes.map(name => 'data-i18n-' + name)]
+        .map(name => '[' + name + ']').join(',');
+    let language = '', initialized = false;
+
+    function t(key, params = {}) {
+        const values = Object.prototype.hasOwnProperty.call(messages, key) && Array.isArray(messages[key]) ? messages[key] : [];
+        const selected = values[columns.get(language)?.index], english = values[columns.get('en')?.index];
+        const text = typeof selected === 'string' ? selected : typeof english === 'string' ? english : String(key);
+        return text.replace(/\{(\w+)\}/g, (match, name) => Object.prototype.hasOwnProperty.call(params || {}, name) ? String(params[name]) : match);
+    }
+    function html(key, params) {
+        return t(key, params).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+    }
+    function message(key, params = {}) { return { key, params: { ...params } }; }
+    function bindText(element, key, params) {
+        if (!element) return;
+        bindings.set(element, message(key, params));
+        element.removeAttribute('data-i18n');
+        element.removeAttribute('data-i18n-params');
+        element.setAttribute('data-i18n-bound-text', '');
+        element.textContent = t(key, params);
+    }
+    function unbindText(element) {
+        if (!element) return;
+        bindings.delete(element);
+        element.removeAttribute('data-i18n-bound-text');
+    }
+    function fillSelector(element) {
+        element.textContent = '';
+        for (const [code, column] of columns) {
+            const option = document.createElement('option');
+            option.value = code; option.textContent = column.name;
+            element.appendChild(option);
+        }
+        if (!selectors.has(element)) element.addEventListener('change', () => setLanguage(element.value));
+        selectors.add(element);
+        element.value = language;
+    }
+    function apply(root = document) {
+        const elements = root.querySelectorAll ? [...root.querySelectorAll(query)] : [];
+        if (root.nodeType === 1) elements.unshift(root);
+        for (const element of elements) {
+            let params = {};
+            try { params = JSON.parse(element.getAttribute('data-i18n-params') || '{}'); } catch (_) {}
+            const binding = bindings.get(element);
+            if (binding) element.textContent = t(binding.key, binding.params);
+            else if (element.hasAttribute('data-i18n')) element.textContent = t(element.getAttribute('data-i18n'), params);
+            for (const attr of attributes) {
+                const key = element.getAttribute('data-i18n-' + attr);
+                if (key) element.setAttribute(attr, t(key, params));
+            }
+            if (element.hasAttribute('data-language-selector')) {
+                if (!selectors.has(element)) fillSelector(element);
+                element.value = language;
+            }
+        }
+    }
+    function normalize(code) {
+        if (typeof code !== 'string') return null;
+        const normalized = code.trim().toLowerCase().replace(/_/g, '-');
+        const base = normalized.split('-')[0];
+        return columns.has(normalized) ? normalized : columns.has(base) ? base : null;
+    }
+    function setLanguage(code, persist = true) {
+        const next = normalize(code) || 'en', changed = next !== language;
+        language = next;
+        if (persist) try { window.localStorage.setItem(storageKey, language); } catch (_) {}
+        document.documentElement.lang = language;
+        apply(document);
+        if (changed) window.dispatchEvent(new window.CustomEvent('languagechange', { detail: { language } }));
+        return language;
+    }
+    function init() {
+        if (initialized) return;
+        let saved;
+        try { saved = window.localStorage.getItem(storageKey); } catch (_) {}
+        const primary = (navigator.language || navigator.languages?.[0] || '').toLowerCase().split(/[-_]/)[0];
+        initialized = true;
+        setLanguage(normalize(saved) || (primary === 'ru' ? 'ru' : 'en'), false);
+        if (window.MutationObserver && document.body) {
+            const observer = new window.MutationObserver(records => {
+                for (const record of records) for (const node of record.addedNodes) if (node.nodeType === 1) apply(node);
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+        }
+    }
+    window.I18n = { t, html, message, bindText, unbindText, apply, setLanguage, getLanguage: () => language, init };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+})(window, document);
+</script>
+<script>
+// Pure CSV helpers shared by POI import/export and the coordinate converter.
+const CSVUtils = (() => {
+    function detectSeparator(text) {
+        const counts = { '\t': 0, ';': 0, ',': 0 };
+        let quoted = false, started = false;
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (!started && (ch === ' ' || ch === '\r' || ch === '\n')) continue;
+            if (!started && ch === '#') {
+                while (i < text.length && text[i] !== '\n') i++;
+                continue;
+            }
+            started = true;
+            if (ch === '"') {
+                if (quoted && text[i + 1] === '"') i++;
+                else quoted = !quoted;
+            } else if (!quoted) {
+                if (ch === '\n' || ch === '\r') break;
+                if (Object.prototype.hasOwnProperty.call(counts, ch)) counts[ch]++;
+            }
+        }
+        const best = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+        return counts[best] > 0 ? best : ' ';
+    }
+
+    function parse(text, separator) {
+        text = String(text).replace(/^\uFEFF/, '');
+        separator = separator || detectSeparator(text);
+        const whitespace = separator === ' ';
+        const rows = [];
+        let row = [], field = '', quoted = false, wasQuoted = false, malformed = false;
+        const finishField = () => {
+            row.push(wasQuoted ? field : field.trim());
+            field = ''; wasQuoted = false;
+        };
+        const finishRow = () => {
+            if (field.length || wasQuoted || row.length) finishField();
+            if (!malformed && row.some(value => value !== '')) rows.push(row);
+            row = []; field = ''; wasQuoted = false; malformed = false;
+        };
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (!quoted && row.length === 0 && field.trim() === '' && !wasQuoted && ch === '#') {
+                while (i < text.length && text[i] !== '\n') i++;
+                field = '';
+                continue;
+            }
+            if (quoted) {
+                if (ch === '"') {
+                    if (text[i + 1] === '"') { field += '"'; i++; }
+                    else quoted = false;
+                } else field += ch;
+            } else if (ch === '"' && field.trim() === '' && !wasQuoted) {
+                field = ''; quoted = true; wasQuoted = true;
+            } else if (ch === '\n' || ch === '\r') {
+                finishRow();
+                if (ch === '\r' && text[i + 1] === '\n') i++;
+            } else if (ch === separator || (whitespace && (ch === '\t' || ch === ' '))) {
+                if (!whitespace || field.length || wasQuoted) finishField();
+            } else if (wasQuoted) {
+                if (ch.trim() !== '') malformed = true;
+            } else field += ch;
+        }
+        if (!quoted) finishRow();
+        return rows;
+    }
+
+    function escapeField(value, separator = ',') {
+        const text = value == null ? '' : String(value);
+        // Quote all recognized separators to preserve auto-detection on reimport.
+        return /[",;\t\r\n]/.test(text) || text.includes(separator) || text.trim() !== text || text.startsWith('#')
+            ? '"' + text.replace(/"/g, '""') + '"' : text;
+    }
+
+    return { parse, escapeField };
+})();
+
+</script>
+<script>
         // ======== МАТЕМАТИКА ========
         const WGS84_A = 6378137.0;
         const WGS84_B = 6356752.314245;
@@ -355,14 +600,26 @@
         let xyzConvertedPoints = [];
         let xyzPreviewData = [];
 
+        function invalidateOutput() {
+            hideStatus();
+            generatedOutput = ''; generatedKml = ''; xyzConvertedPoints = [];
+            document.getElementById('outputData').value = '';
+            ['btnDownloadGeo2Xyz', 'btnCopyGeo2Xyz', 'btnDownloadXyz2Geo', 'btnDownloadKml', 'btnCopyXyz2Geo']
+                .forEach(id => { const button = document.getElementById(id); if (button) button.disabled = true; });
+        }
+
+        // Every input affecting an export invalidates the previously computed result.
+        ['geoInput','geoLatCol','geoLonCol','geoDepthCol','geoRefLat','geoRefLon',
+            'xyzInput','xyzXCol','xyzYCol','xyzZCol','xyzRefLat','xyzRefLon','xyzHeading','xyzHeadingSlider']
+            .forEach(id => ['input','change'].forEach(type => document.getElementById(id).addEventListener(type, invalidateOutput)));
+
         // ======== ПЕРЕКЛЮЧЕНИЕ ========
         function switchMode(mode) {
             currentMode = mode;
             document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
             document.getElementById('modeGeo2Xyz').classList.toggle('hidden', mode !== 'geo2xyz');
             document.getElementById('modeXyz2Geo').classList.toggle('hidden', mode !== 'xyz2geo');
-            generatedOutput = ''; generatedKml = '';
-            updateAllButtons(true);
+            invalidateOutput();
             hideStatus();
         }
 
@@ -371,10 +628,17 @@
                 ? ['btnDownloadGeo2Xyz', 'btnCopyGeo2Xyz']
                 : ['btnDownloadXyz2Geo', 'btnDownloadKml', 'btnCopyXyz2Geo'];
             ids.forEach(id => { const b = document.getElementById(id); if (b) b.disabled = disabled; });
+            document.getElementById('btnDownloadKml').disabled = disabled || !generatedKml;
         }
 
-        function showStatus(msg, type) { const s = document.getElementById('status'); s.className = 'status ' + type; s.textContent = msg; }
-        function hideStatus() { document.getElementById('status').className = 'status'; }
+        function showStatus(msg, type) { const s = document.getElementById('status'); s.className = 'status ' + type; if (msg && typeof msg === 'object' && msg.key) I18n.bindText(s, msg.key, msg.params);
+            else { I18n.unbindText(s); s.textContent = msg; } }
+        function hideStatus() {
+            const status = document.getElementById('status');
+            I18n.unbindText(status);
+            status.textContent = '';
+            status.className = 'status';
+        }
 
         // ======== ПАРСИНГ ========
         function detectSeparator(text) {
@@ -385,22 +649,56 @@
             return best[1] > 0 ? best[0] : ',';
         }
 
-        function parseCsvData(text) {
-            const sep = detectSeparator(text);
-            const lines = text.split('\n').filter(l => l.trim());
-            const first = lines[0].split(sep).map(h => h.trim());
-            const second = lines.length > 1 ? lines[1].split(sep) : null;
-            let hasHeader = false;
-            if (second && first.length === second.length) {
-                const fN = first.every(v => !isNaN(parseFloat(v.replace(',','.'))) || v.trim()==='');
-                const sN = second.every(v => !isNaN(parseFloat(v.replace(',','.'))) || v.trim()==='');
-                if (!fN && sN) hasHeader = true;
-                if (first.some(v => /[NSWE]/.test(v.toUpperCase())) && !fN) hasHeader = true;
-            }
-            const headers = hasHeader ? first : first.map((_,i) => `Col ${i+1}`);
-            const rows = hasHeader ? lines.slice(1).map(l => l.split(sep).map(v => v.trim())) : lines.map(l => l.split(sep).map(v => v.trim()));
-            return { headers, rows };
-        }
+		// Извлекает метаданные из строк-комментариев вида "# Ref point: lat, lon"
+		// и/или "# Ref: lat, lon, Heading: N°"
+		function extractCsvMeta(text) {
+			const meta = { refLat: null, refLon: null, heading: null };
+			const lines = text.split('\n');
+			for (const raw of lines) {
+				const line = raw.trim();
+				if (!line.startsWith('#')) continue;
+
+				// Ref point: 48.52448073, 44.51573125
+				let m = line.match(/#\s*Ref\s*point\s*:\s*(-?\d+(?:[.,]\d+)?)\s*,\s*(-?\d+(?:[.,]\d+)?)/i);
+				if (m) {
+					meta.refLat = parseFloat(m[1].replace(',', '.'));
+					meta.refLon = parseFloat(m[2].replace(',', '.'));
+					continue;
+				}
+
+				// Ref: 48.52448073, 44.51573125, Heading: 90°
+				m = line.match(/#\s*Ref\s*:\s*(-?\d+(?:[.,]\d+)?)\s*,\s*(-?\d+(?:[.,]\d+)?)(?:\s*,\s*Heading\s*:\s*(-?\d+(?:[.,]\d+)?))?/i);
+				if (m) {
+					meta.refLat = parseFloat(m[1].replace(',', '.'));
+					meta.refLon = parseFloat(m[2].replace(',', '.'));
+					if (m[3] !== undefined) meta.heading = parseFloat(m[3].replace(',', '.'));
+				}
+			}
+			return meta;
+		}
+
+		function parseCsvData(text) {
+			const records = CSVUtils.parse(text);
+			if (records.length === 0) return { headers: [], rows: [] };
+			const first = records[0];
+			const second = records[1] || null;
+
+			let hasHeader = false;
+			if (second && first.length === second.length) {
+				const isNum = v => v !== '' && !isNaN(parseFloat(v.replace(',', '.')));
+				const fN = first.every(isNum);
+				const sN = second.every(isNum);
+				if (!fN && sN) hasHeader = true;
+				if (!fN && first.some(v => /[A-Za-z_]/.test(v))) hasHeader = true;
+			} else if (first.length === 1 && isNaN(parseFloat(first[0]))) {
+				hasHeader = true;
+			}
+
+			const headers = hasHeader ? first : first.map((_, i) => `Col ${i + 1}`);
+			const rows = hasHeader ? records.slice(1) : records;
+
+			return { headers, rows };
+		}
 
         function parseKmlCoords(kmlText) {
             const points = [];
@@ -443,16 +741,25 @@
         function buildColumnSelectors(headers, latId, lonId, depthId) {
             const latSel = document.getElementById(latId), lonSel = document.getElementById(lonId), depthSel = document.getElementById(depthId);
             latSel.innerHTML = ''; lonSel.innerHTML = '';
-            if (depthSel) depthSel.innerHTML = '<option value="-1">— Не использовать —</option>';
+            if (depthSel) depthSel.innerHTML = '<option value="-1" data-i18n="tools.coord.unused">— Не использовать —</option>';
             headers.forEach((h, i) => {
-                const t = `${i}: ${escHtml(h)}`;
+                const t = `${i}: ${h}`;
                 latSel.add(new Option(t, i)); lonSel.add(new Option(t, i));
                 if (depthSel) depthSel.add(new Option(t, i));
             });
-            const findCol = (keys) => { for (const k of keys) { const idx = headers.findIndex(h => h.toLowerCase().includes(k)); if (idx >= 0) return String(idx); } return '-1'; };
-            latSel.value = findCol(['lat','latitude','широта','north','northing','n','шир','y']) || '0';
-            lonSel.value = findCol(['lon','long','longitude','долгота','east','easting','e','долг','x']) || (headers.length > 1 ? '1' : '0');
-            if (depthSel) depthSel.value = findCol(['alt','altitude','height','depth','высота','глубина','z','elev','dpt']);
+            const findCol = keys => {
+                for (const key of keys) {
+                    const index = headers.findIndex(h => h.trim().toLowerCase().split(/[\s_(),]+/)[0] === key);
+                    if (index >= 0) return index;
+                }
+                return -1;
+            };
+            const xyz = latId === 'xyzXCol';
+            const first = findCol(xyz ? ['x','east','easting','e'] : ['lat','latitude','широта','шир','north','northing','n','y']);
+            const second = findCol(xyz ? ['y','north','northing','n'] : ['lon','long','longitude','долгота','долг','east','easting','e','x']);
+            latSel.value = String(first >= 0 ? first : 0);
+            lonSel.value = String(second >= 0 ? second : (headers.length > 1 ? 1 : 0));
+            if (depthSel) depthSel.value = String(findCol(['z','depth','dpt','alt','altitude','height','высота','глубина','elev','elevation']));
         }
 
         // ======== Geo → XYZ ========
@@ -468,19 +775,39 @@
         document.getElementById('geoInput').addEventListener('input', parseGeoInput);
 
         function parseGeoInput() {
-            const text = document.getElementById('geoInput').value.trim();
-            if (!text) { geoParsedPoints = []; geoHeaders = []; geoRows = []; updateGeoPreview(); return; }
-            if (text.startsWith('<?xml') || text.includes('<kml')) {
-                geoParsedPoints = parseKmlCoords(text);
-                geoHeaders = ['Name','Lat','Lon','Depth'];
-                geoRows = geoParsedPoints.map(p => [p.name, String(p.lat), String(p.lon), String(p.depth)]);
-            } else {
-                const parsed = parseCsvData(text);
-                geoHeaders = parsed.headers; geoRows = parsed.rows; geoParsedPoints = [];
-            }
-            buildColumnSelectors(geoHeaders, 'geoLatCol', 'geoLonCol', 'geoDepthCol');
-            updateGeoCentroid(); updateGeoPreview();
-        }
+			invalidateOutput();
+			const text = document.getElementById('geoInput').value.trim();
+			if (!text) {
+				geoParsedPoints = []; geoHeaders = []; geoRows = [];
+				updateGeoPreview(); return;
+			}
+
+			if (text.startsWith('<?xml') || text.includes('<kml')) {
+				geoParsedPoints = parseKmlCoords(text);
+				geoHeaders = ['Name', 'Lat', 'Lon', 'Depth'];
+				geoRows = geoParsedPoints.map(p => [p.name, String(p.lat), String(p.lon), String(p.depth)]);
+			} else {
+				const parsed = parseCsvData(text);
+				geoHeaders = parsed.headers;
+				geoRows = parsed.rows;
+				geoParsedPoints = [];
+
+				// Подставляем Ref-точку из комментария, если поле пустое
+				const meta = extractCsvMeta(text);
+				const refLatEl = document.getElementById('geoRefLat');
+				const refLonEl = document.getElementById('geoRefLon');
+				if (meta.refLat !== null && refLatEl.value.trim() === '') {
+					refLatEl.value = meta.refLat;
+				}
+				if (meta.refLon !== null && refLonEl.value.trim() === '') {
+					refLonEl.value = meta.refLon;
+				}
+			}
+
+			buildColumnSelectors(geoHeaders, 'geoLatCol', 'geoLonCol', 'geoDepthCol');
+			updateGeoCentroid();
+			updateGeoPreview();
+		}
 
         function getGeoRefPoint() {
             const lat = parseFloat(document.getElementById('geoRefLat').value);
@@ -510,16 +837,16 @@
             const ref = getGeoRefPoint();
             const info = document.getElementById('geoCentroidInfo');
             if (ref && document.getElementById('geoRefLat').value === '') {
-                info.textContent = `Центроида: ${ref.lat.toFixed(6)}, ${ref.lon.toFixed(6)}`;
+                I18n.bindText(info, 'tools.coord.centroid', { lat: ref.lat.toFixed(6), lon: ref.lon.toFixed(6) });
             } else if (ref) {
-                info.textContent = `Центроида: ${ref.lat.toFixed(6)}, ${ref.lon.toFixed(6)} (переопределено)`;
+                I18n.bindText(info, 'tools.coord.centroidOverride', { lat: ref.lat.toFixed(6), lon: ref.lon.toFixed(6) });
             } else {
-                info.textContent = 'Нет данных';
+                I18n.bindText(info, 'tools.coord.noData');
             }
         }
 
-        document.getElementById('geoRefLat').addEventListener('input', updateGeoCentroid);
-        document.getElementById('geoRefLon').addEventListener('input', updateGeoCentroid);
+        document.getElementById('geoRefLat').addEventListener('input', () => { updateGeoCentroid(); updateGeoPreview(); });
+        document.getElementById('geoRefLon').addEventListener('input', () => { updateGeoCentroid(); updateGeoPreview(); });
         document.getElementById('geoLatCol').addEventListener('change', () => { updateGeoCentroid(); updateGeoPreview(); });
         document.getElementById('geoLonCol').addEventListener('change', () => { updateGeoCentroid(); updateGeoPreview(); });
         document.getElementById('geoDepthCol').addEventListener('change', updateGeoPreview);
@@ -528,34 +855,35 @@
             const ref = getGeoRefPoint();
             const tbody = document.getElementById('geoPreviewBody');
             if (!ref || geoRows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">Загрузите данные</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;" data-i18n="tools.coord.loadData">Загрузите данные</td></tr>';
                 return;
             }
             const latIdx = parseInt(document.getElementById('geoLatCol').value);
             const lonIdx = parseInt(document.getElementById('geoLonCol').value);
             const depthIdx = parseInt(document.getElementById('geoDepthCol').value);
-            if (isNaN(latIdx) || isNaN(lonIdx)) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);">Выберите столбцы</td></tr>'; return; }
+            if (isNaN(latIdx) || isNaN(lonIdx)) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);" data-i18n="tools.coord.selectColumns">Выберите столбцы</td></tr>'; return; }
             const preview = geoRows.slice(0, 20);
             tbody.innerHTML = preview.map((row, i) => {
                 const lat = parseFloat(row[latIdx]?.replace(',','.'));
                 const lon = parseFloat(row[lonIdx]?.replace(',','.'));
                 const depth = depthIdx >= 0 ? parseFloat(row[depthIdx]?.replace(',','.')) || 0 : 0;
-                if (isNaN(lat) || isNaN(lon)) return `<tr><td>${i+1}</td><td colspan="7" style="color:#f44336;">Нет координат</td></tr>`;
+                if (isNaN(lat) || isNaN(lon)) return `<tr><td>${i+1}</td><td colspan="7" style="color:#f44336;" data-i18n="tools.coord.noCoordinates">Нет координат</td></tr>`;
                 const xyz = geoToXyz(lat, lon, depth, ref.lat, ref.lon);
                 return `<tr><td>${i+1}</td><td>${escHtml(row[0]||'')}</td><td>${lat.toFixed(6)}</td><td>${lon.toFixed(6)}</td><td>${depth.toFixed(1)}</td><td>${xyz.x.toFixed(2)}</td><td>${xyz.y.toFixed(2)}</td><td>${xyz.z.toFixed(2)}</td></tr>`;
             }).join('');
         }
 
         function convertGeoToXyz() {
+            invalidateOutput();
             const ref = getGeoRefPoint();
-            if (!ref) { showStatus('❌ Не удалось определить опорную точку', 'error'); return; }
+            if (!ref) { showStatus(I18n.message('tools.error.reference'), 'error'); return; }
             const latIdx = parseInt(document.getElementById('geoLatCol').value);
             const lonIdx = parseInt(document.getElementById('geoLonCol').value);
             const depthIdx = parseInt(document.getElementById('geoDepthCol').value);
-            if (isNaN(latIdx) || isNaN(lonIdx)) { showStatus('❌ Выберите столбцы координат', 'error'); return; }
-            if (geoRows.length === 0) { showStatus('❌ Нет данных', 'error'); return; }
+            if (isNaN(latIdx) || isNaN(lonIdx)) { showStatus(I18n.message('tools.error.coordinateColumns'), 'error'); return; }
+            if (geoRows.length === 0) { showStatus(I18n.message('tools.error.noData'), 'error'); return; }
 
-            let csv = `# Ref point: ${ref.lat.toFixed(8)}, ${ref.lon.toFixed(8)}\nName,X_m,Y_m,Z_m\n`;
+            let csv = `Name,X_m,Y_m,Z_m,RefLat,RefLon\n`;
             let count = 0;
             geoRows.forEach(row => {
                 const lat = parseFloat(row[latIdx]?.replace(',','.'));
@@ -563,14 +891,14 @@
                 const depth = depthIdx >= 0 ? parseFloat(row[depthIdx]?.replace(',','.')) || 0 : 0;
                 if (isNaN(lat) || isNaN(lon)) return;
                 const xyz = geoToXyz(lat, lon, depth, ref.lat, ref.lon);
-                const name = (row[0]||'').includes(',') ? `"${row[0]}"` : (row[0] || `Point ${count+1}`);
-                csv += `${name},${xyz.x.toFixed(2)},${xyz.y.toFixed(2)},${xyz.z.toFixed(2)}\n`;
+                const name = CSVUtils.escapeField(row[0] || `Point ${count+1}`);
+                csv += `${name},${xyz.x.toFixed(2)},${xyz.y.toFixed(2)},${xyz.z.toFixed(2)},${ref.lat.toFixed(8)},${ref.lon.toFixed(8)}\n`;
                 count++;
             });
             generatedOutput = csv; generatedFileExt = '.csv'; generatedKml = '';
             document.getElementById('outputData').value = generatedOutput;
             updateAllButtons(false);
-            showStatus(`✅ Сконвертировано ${count} точек. Ref: ${ref.lat.toFixed(6)}, ${ref.lon.toFixed(6)}`, 'success');
+            showStatus(I18n.message('tools.coord.convertedGeo', { count, lat: ref.lat.toFixed(6), lon: ref.lon.toFixed(6) }), 'success');
         }
 
         // ======== XYZ → Geo ========
@@ -586,13 +914,35 @@
         document.getElementById('xyzInput').addEventListener('input', parseXyzInput);
 
         function parseXyzInput() {
-            const text = document.getElementById('xyzInput').value.trim();
-            if (!text) { xyzHeaders = []; xyzRows = []; updateXyzPreview(); updateXyzPreviewData(); return; }
-            const parsed = parseCsvData(text);
-            xyzHeaders = parsed.headers; xyzRows = parsed.rows;
-            buildColumnSelectors(xyzHeaders, 'xyzXCol', 'xyzYCol', 'xyzZCol');
-            updateXyzPreview(); updateXyzPreviewData();
-        }
+			invalidateOutput();
+			const text = document.getElementById('xyzInput').value.trim();
+			if (!text) {
+				xyzHeaders = []; xyzRows = [];
+				updateXyzPreview(); updateXyzPreviewData(); return;
+			}
+			const parsed = parseCsvData(text);
+			xyzHeaders = parsed.headers;
+			xyzRows = parsed.rows;
+
+			// Подставляем Ref-точку и Heading из комментария, если поля пустые
+			const meta = extractCsvMeta(text);
+			const refLatEl = document.getElementById('xyzRefLat');
+			const refLonEl = document.getElementById('xyzRefLon');
+			const hdgEl = document.getElementById('xyzHeading');
+
+			if (meta.refLat !== null && refLatEl.value.trim() === '') refLatEl.value = meta.refLat;
+			if (meta.refLon !== null && refLonEl.value.trim() === '') refLonEl.value = meta.refLon;
+			if (meta.heading !== null && hdgEl.value.trim() === '') {
+				hdgEl.value = meta.heading;
+				const slider = document.getElementById('xyzHeadingSlider');
+				slider.value = Math.round(meta.heading) % 360;
+				document.getElementById('xyzHeadingValue').textContent = Math.round(meta.heading) % 360 + '°';
+			}
+
+			buildColumnSelectors(xyzHeaders, 'xyzXCol', 'xyzYCol', 'xyzZCol');
+			updateXyzPreview();
+			updateXyzPreviewData();
+		}
 
         function updateXyzPreviewData() {
             const xIdx = parseInt(document.getElementById('xyzXCol').value);
@@ -610,6 +960,7 @@
         }
 
         function onHeadingSliderChange() {
+            invalidateOutput();
             const val = document.getElementById('xyzHeadingSlider').value;
             document.getElementById('xyzHeadingValue').textContent = val + '°';
             document.getElementById('xyzHeading').value = val;
@@ -641,11 +992,11 @@
             const tbody = document.getElementById('xyzPreviewBody');
 
             if (xyzRows.length === 0 || isNaN(xIdx) || isNaN(yIdx)) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">Загрузите данные</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;" data-i18n="tools.coord.loadData">Загрузите данные</td></tr>';
                 return;
             }
             if (isNaN(refLat) || isNaN(refLon)) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#f44336;padding:20px;">Введите точку привязки</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#f44336;padding:20px;" data-i18n="tools.coord.enterReference">Введите точку привязки</td></tr>';
                 return;
             }
 
@@ -654,7 +1005,7 @@
                 const x = parseFloat(row[xIdx]?.replace(',','.'));
                 const y = parseFloat(row[yIdx]?.replace(',','.'));
                 const z = zIdx >= 0 ? parseFloat(row[zIdx]?.replace(',','.')) || 0 : 0;
-                if (isNaN(x) || isNaN(y)) return `<tr><td>${i+1}</td><td colspan="6" style="color:#f44336;">Нет координат</td></tr>`;
+                if (isNaN(x) || isNaN(y)) return `<tr><td>${i+1}</td><td colspan="6" style="color:#f44336;" data-i18n="tools.coord.noCoordinates">Нет координат</td></tr>`;
                 const geo = xyzToGeo(x, y, z, refLat, refLon, heading);
                 return `<tr><td>${i+1}</td><td>${x.toFixed(2)}</td><td>${y.toFixed(2)}</td><td>${z.toFixed(2)}</td><td>${geo.lat.toFixed(8)}</td><td>${geo.lon.toFixed(8)}</td><td>${geo.depth.toFixed(1)}</td></tr>`;
             }).join('');
@@ -675,7 +1026,7 @@
 
             if (isNaN(refLat) || isNaN(refLon)) {
                 ctx.fillStyle = '#f44336'; ctx.font = '14px Arial'; ctx.textAlign = 'center';
-                ctx.fillText('Введите точку привязки', w/2, h/2); return;
+                ctx.fillText(I18n.t('tools.coord.enterReference'), w/2, h/2); return;
             }
 
             const hdgRad = heading * Math.PI / 180;
@@ -749,7 +1100,7 @@
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
             ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + barPx, by); ctx.stroke();
             ctx.fillStyle = '#fff'; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center';
-            ctx.fillText(barM >= 1000 ? `${(barM/1000).toFixed(1)} км` : `${Math.round(barM)} м`, bx + barPx/2, by - 8);
+            ctx.fillText(barM >= 1000 ? I18n.t('tools.map.kilometers', { value: (barM / 1000).toFixed(1) }) : I18n.t('tools.map.meters', { value: Math.round(barM) }), bx + barPx/2, by - 8);
         }
 
         function getNiceScale(rangeX, rangeY, w, h) {
@@ -759,6 +1110,7 @@
         }
 
         function convertXyzToGeo() {
+            invalidateOutput();
             const refLat = parseFloat(document.getElementById('xyzRefLat').value);
             const refLon = parseFloat(document.getElementById('xyzRefLon').value);
             const heading = parseFloat(document.getElementById('xyzHeading').value) || 0;
@@ -766,12 +1118,12 @@
             const yIdx = parseInt(document.getElementById('xyzYCol').value);
             const zIdx = parseInt(document.getElementById('xyzZCol').value);
 
-            if (isNaN(refLat) || isNaN(refLon)) { showStatus('❌ Введите точку привязки', 'error'); return; }
-            if (isNaN(xIdx) || isNaN(yIdx)) { showStatus('❌ Выберите столбцы X и Y', 'error'); return; }
-            if (xyzRows.length === 0) { showStatus('❌ Нет данных', 'error'); return; }
+            if (isNaN(refLat) || isNaN(refLon)) { showStatus(I18n.message('tools.error.enterReference'), 'error'); return; }
+            if (isNaN(xIdx) || isNaN(yIdx)) { showStatus(I18n.message('tools.error.xyColumns'), 'error'); return; }
+            if (xyzRows.length === 0) { showStatus(I18n.message('tools.error.noData'), 'error'); return; }
 
             xyzConvertedPoints = [];
-            let csv = `# Ref: ${refLat.toFixed(8)}, ${refLon.toFixed(8)}, Heading: ${heading}°\nLatitude,Longitude,Depth_m\n`;
+            let csv = `Latitude,Longitude,Depth_m,RefLat,RefLon,Heading\n`;
             let count = 0;
 
             xyzRows.forEach(row => {
@@ -780,7 +1132,7 @@
                 const z = zIdx >= 0 ? parseFloat(row[zIdx]?.replace(',','.')) || 0 : 0;
                 if (isNaN(x) || isNaN(y)) return;
                 const geo = xyzToGeoVincenty(x, y, z, refLat, refLon, heading);
-                csv += `${geo.lat.toFixed(8)},${geo.lon.toFixed(8)},${geo.depth.toFixed(1)}\n`;
+                csv += `${geo.lat.toFixed(8)},${geo.lon.toFixed(8)},${geo.depth.toFixed(1)},${refLat.toFixed(8)},${refLon.toFixed(8)},${heading}\n`;
                 xyzConvertedPoints.push(geo);
                 count++;
             });
@@ -793,7 +1145,7 @@
             generatedOutput = csv; generatedFileExt = '.csv';
             document.getElementById('outputData').value = generatedOutput;
             updateAllButtons(false);
-            showStatus(`✅ Сконвертировано ${count} точек (Vincenty). Ref: ${refLat.toFixed(6)}, ${refLon.toFixed(6)}, Hdg: ${heading}°`, 'success');
+            showStatus(I18n.message('tools.coord.convertedXyz', { count, lat: refLat.toFixed(6), lon: refLon.toFixed(6), heading }), 'success');
         }
 
         // ======== ВЫВОД ========
@@ -815,18 +1167,19 @@
 
         function copyToClipboard() {
             if (!generatedOutput) { if (currentMode === 'geo2xyz') convertGeoToXyz(); else convertXyzToGeo(); if (!generatedOutput) return; }
-            navigator.clipboard.writeText(generatedOutput).then(() => showStatus('📋 Скопировано', 'info')).catch(() => showStatus('❌ Ошибка', 'error'));
+            navigator.clipboard.writeText(generatedOutput).then(() => showStatus(I18n.message('tools.copied'), 'info')).catch(() => showStatus(I18n.message('tools.error.generic'), 'error'));
         }
 
         function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-        // ======== PWA ========
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                const swBlob = new Blob([`const C='geo-xyz-v2';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['/']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));`], {type:'application/javascript'});
-                navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
-            });
-        }
+        window.addEventListener('languagechange', () => {
+            updateGeoCentroid();
+            updateGeoPreview();
+            updateXyzPreviewTableOnly();
+            drawXyzPreview();
+            I18n.apply(document.getElementById('geoPreviewBody'));
+            I18n.apply(document.getElementById('xyzPreviewBody'));
+        });
     </script>
 </body>
 </html>

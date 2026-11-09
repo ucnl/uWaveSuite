@@ -8,10 +8,33 @@ const UTM = (() => {
     const WGS84_E4 = WGS84_E2 * WGS84_E2;
     const WGS84_E6 = WGS84_E4 * WGS84_E2;
     
-    function getZone(lonDeg) {
-        return Math.floor((lonDeg + 180) / 6) + 1;
+	function getZone(lonDeg) {
+        let zone = Math.floor((lonDeg + 180) / 6) + 1;
+        // lon=180° даёт zone=61, что невалидно. Ограничиваем [1, 60].
+        if (zone > 60) zone = 60;
+        if (zone < 1) zone = 1;
+        return zone;
     }
     
+	// Особые случаи UTM: Норвегия и Шпицберген.
+    // Базовая зона вычисляется по долготе, затем корректируется по широте.
+    function applySpecialZones(zone, latDeg, lonDeg) {
+        // Норвегия: полоса 56°..64° N, 3°..12° E — зона 32
+        if (latDeg >= 56 && latDeg < 64 && lonDeg >= 3 && lonDeg < 12) {
+            return 32;
+        }
+        // Шпицберген: полоса 72°..84° N, 0°..42° E
+        if (latDeg >= 72 && latDeg < 84 && lonDeg >= 0 && lonDeg < 42) {
+            if (lonDeg < 9)  return 31;
+            if (lonDeg < 21) return 33;
+            if (lonDeg < 33) return 35;
+            return 37;
+        }
+        return zone;
+    }
+	
+	
+	
     function getUtmLetter(latDeg) {
         if (latDeg >= 72 && latDeg < 84) return 'X';
         if (latDeg >= 64 && latDeg < 72) return 'W';
@@ -41,7 +64,7 @@ const UTM = (() => {
      * @returns {{ easting: number, northing: number, zone: number, letter: string }}
      */
     function fromLatLon(latDeg, lonDeg) {
-        const zone = getZone(lonDeg);
+        const zone = applySpecialZones(getZone(lonDeg), latDeg, lonDeg);
         const letter = getUtmLetter(latDeg);
         
         const latRad = latDeg * Math.PI / 180;
@@ -65,17 +88,19 @@ const UTM = (() => {
             - (35*WGS84_E6/3072) * Math.sin(6*latRad)
         );
         
-        const easting = 500000 + N * (
+		const k0 = 0.9996;
+        
+        const easting = 500000 + k0 * N * (
             A
             + (1 - T + C) * A*A*A / 6
             + (5 - 18*T + T*T + 72*C - 58*WGS84_E2) * A*A*A*A*A / 120
         );
         
-        let northing = M + N * tanLat * (
+        let northing = k0 * (M + N * tanLat * (
             A*A / 2
             + (5 - T + 9*C + 4*C*C) * A*A*A*A / 24
             + (61 - 58*T + T*T + 600*C - 330*WGS84_E2) * A*A*A*A*A*A / 720
-        );
+        ));
         
         // Южное полушарие
         if (latDeg < 0) {
