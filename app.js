@@ -3,7 +3,7 @@
 
 const UWApp = (() => {
 
-    const APP_VERSION = '0.5.6';
+    const APP_VERSION = '0.5.7';
     const APP_NAME = 'uWaveSuite';
 
     // ========== DOM ЭЛЕМЕНТЫ ==========
@@ -1568,6 +1568,9 @@ const UWApp = (() => {
 		
 		// 5. Подписки на Logger
 		Logger.onEntry = (data, ts, originalTime, entry) => {
+			
+			UWUSBLsolver.setTimeProvider(() => originalTime);
+			
 			processPlaybackEntry({
 				type: entry.type,
 				level: entry.level,
@@ -1590,6 +1593,10 @@ const UWApp = (() => {
 			// Автоматически вызывается Logger'ом в конце
 			isPlaying = false;
 			hidePlaybackControls();
+			
+			if (typeof UWUSBLsolver !== 'undefined') {
+				UWUSBLsolver.setTimeProvider(() => new Date());
+			}			
 			
 			if (btnConnection) btnConnection.disabled = false;
 			if (btnGnss) btnGnss.disabled = false;
@@ -1759,6 +1766,10 @@ const UWApp = (() => {
 
 	function stopPlayback() {
 		isPlaying = false;
+		
+		if (typeof UWUSBLsolver !== 'undefined') {
+			UWUSBLsolver.setTimeProvider(() => new Date());
+		}
 		
 		// Останавливаем Logger и снимаем подписки
 		if (typeof Logger !== 'undefined') {
